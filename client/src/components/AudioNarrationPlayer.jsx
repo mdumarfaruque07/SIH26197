@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Volume2, VolumeX, Play, Pause, RotateCcw, Sparkles } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
-export default function AudioNarrationPlayer({ text, title }) {
+export default function AudioNarrationPlayer({ text, title, textHi, titleHi }) {
+  const { lang, t } = useLanguage();
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(true);
@@ -31,19 +33,28 @@ export default function AudioNarrationPlayer({ text, title }) {
 
     window.speechSynthesis.cancel(); // cancel any active narration
 
-    const utterance = new SpeechSynthesisUtterance(text);
+    const textToSpeak = lang === 'hi' && textHi ? textHi : text;
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
     utterance.rate = rate;
     utterance.pitch = 1.0;
 
-    // Try finding an English (India) or English voice
     const voices = window.speechSynthesis.getVoices();
-    const preferredVoice =
-      voices.find((v) => v.lang.includes('en-IN')) ||
-      voices.find((v) => v.lang.startsWith('en')) ||
-      voices[0];
 
-    if (preferredVoice) {
-      utterance.voice = preferredVoice;
+    if (lang === 'hi') {
+      utterance.lang = 'hi-IN';
+      const hindiVoice =
+        voices.find((v) => v.lang.includes('hi-IN')) ||
+        voices.find((v) => v.lang.startsWith('hi')) ||
+        voices.find((v) => v.lang.includes('en-IN')) ||
+        voices[0];
+      if (hindiVoice) utterance.voice = hindiVoice;
+    } else {
+      utterance.lang = 'en-IN';
+      const englishVoice =
+        voices.find((v) => v.lang.includes('en-IN')) ||
+        voices.find((v) => v.lang.startsWith('en')) ||
+        voices[0];
+      if (englishVoice) utterance.voice = englishVoice;
     }
 
     utterance.onend = () => {
@@ -101,14 +112,14 @@ export default function AudioNarrationPlayer({ text, title }) {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold tracking-wider uppercase text-heritage-700 flex items-center gap-1">
-                <Sparkles className="w-3 h-3" /> AI Audio Guide
+                <Sparkles className="w-3 h-3" /> {lang === 'hi' ? 'सांस्कृतिक ऑडियो गाइड' : 'Heritage Audio Guide'}
               </span>
               <span className="text-[10px] bg-white px-2 py-0.5 rounded-full border border-heritage-200 text-stone-600 font-medium">
-                Free Browser TTS
+                {lang === 'hi' ? 'हिंदी वाणी' : 'Native TTS'}
               </span>
             </div>
             <h4 className="text-sm font-semibold text-stone-900 mt-0.5">
-              Listen to Story narration
+              {lang === 'hi' && titleHi ? titleHi : title || (lang === 'hi' ? 'ऐतिहासिक कथा का वाचन सुनें' : 'Listen to Story narration')}
             </h4>
           </div>
         </div>
@@ -128,9 +139,9 @@ export default function AudioNarrationPlayer({ text, title }) {
             className="text-xs font-medium bg-white border border-stone-200 rounded-lg px-2.5 py-2 text-stone-700 focus:outline-none focus:ring-1 focus:ring-heritage-500"
             title="Narration Speed"
           >
-            <option value="0.8">0.8x Speed</option>
-            <option value="1">1.0x Speed</option>
-            <option value="1.2">1.2x Speed</option>
+            <option value="0.8">0.8x</option>
+            <option value="1">1.0x</option>
+            <option value="1.2">1.2x</option>
           </select>
 
           {/* Play / Pause Button */}
@@ -140,7 +151,11 @@ export default function AudioNarrationPlayer({ text, title }) {
               className="flex items-center gap-1.5 px-4 py-2 bg-heritage-600 hover:bg-heritage-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all hover:scale-105"
             >
               <Play className="w-3.5 h-3.5 fill-current" />
-              <span>{isPaused ? 'Resume' : 'Play Audio'}</span>
+              <span>
+                {isPaused
+                  ? (lang === 'hi' ? 'पुनः चलाएं' : 'Resume')
+                  : (lang === 'hi' ? 'ऑडियो सुनें' : 'Play Audio')}
+              </span>
             </button>
           ) : (
             <button
@@ -148,7 +163,7 @@ export default function AudioNarrationPlayer({ text, title }) {
               className="flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all"
             >
               <Pause className="w-3.5 h-3.5 fill-current" />
-              <span>Pause</span>
+              <span>{lang === 'hi' ? 'रोकें' : 'Pause'}</span>
             </button>
           )}
 

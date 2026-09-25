@@ -2,10 +2,12 @@ import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Compass, Map, Search, ShoppingBag, Bookmark } from 'lucide-react';
 import { useKeyboardVisible } from '../hooks/useKeyboardVisible';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function BottomNav({ onOpenSearch }) {
   const location = useLocation();
   const isKeyboardVisible = useKeyboardVisible();
+  const { lang, t } = useLanguage();
 
   // Hide bottom navigation bar on authentication screens or when mobile virtual keyboard is active
   const isAuthRoute =
@@ -21,30 +23,30 @@ export default function BottomNav({ onOpenSearch }) {
   const navItems = [
     {
       to: '/',
-      label: 'Feed',
+      label: t('navFeed'),
       icon: Compass,
       exact: true,
     },
     {
       to: '/map',
-      label: 'Map Radar',
+      label: t('navMap'),
       icon: Map,
     },
     {
       action: onOpenSearch,
-      label: 'Search',
+      label: t('navSearch'),
       icon: Search,
       isButton: true,
     },
     {
       to: '/bazaar',
-      label: 'Bazaar',
+      label: t('navBazaar'),
       icon: ShoppingBag,
       badge: 'ODOP',
     },
     {
       to: '/bookmarks',
-      label: 'Saved',
+      label: lang === 'hi' ? 'सहेजे' : 'Saved',
       icon: Bookmark,
     },
   ];

@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { MapPin, Compass, Camera, ShieldCheck, LogIn, LogOut, User, Menu, X, Landmark, Bookmark, ShoppingBag } from 'lucide-react';
+import { MapPin, Compass, Camera, ShieldCheck, LogIn, LogOut, User, Menu, X, Landmark, Bookmark, ShoppingBag, Languages, QrCode, Shield, Store } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 
-export default function Navbar({ onOpenPostModal, onOpenMenu }) {
+export default function Navbar({ onOpenPostModal, onOpenMenu, onOpenQRScanner, onOpenPassport }) {
   const { user, logout, isAdmin } = useAuth();
+  const { lang, toggleLanguage, t } = useLanguage();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -21,10 +23,10 @@ export default function Navbar({ onOpenPostModal, onOpenMenu }) {
             </div>
             <div>
               <div className="font-serif text-2xl font-bold tracking-tight text-stone-900 group-hover:text-heritage-600 transition-colors">
-                संस्कृति <span className="text-heritage-600 font-sans text-lg font-semibold">Khoj</span>
+                {lang === 'hi' ? 'संस्कृति खोज' : 'संस्कृति'} <span className="text-heritage-600 font-sans text-lg font-semibold">{lang === 'hi' ? '' : 'Khoj'}</span>
               </div>
               <p className="text-[10px] text-stone-600 font-medium tracking-wider uppercase -mt-1">
-                India Heritage & Culture Portal
+                {t('portalSubtitle')}
               </p>
             </div>
           </Link>
@@ -40,7 +42,7 @@ export default function Navbar({ onOpenPostModal, onOpenMenu }) {
               }`}
             >
               <Compass className="w-4 h-4 text-heritage-500" />
-              <span>Culture Feed</span>
+              <span>{t('cultureFeed')}</span>
             </Link>
 
             <Link
@@ -52,7 +54,7 @@ export default function Navbar({ onOpenPostModal, onOpenMenu }) {
               }`}
             >
               <MapPin className="w-4 h-4 text-heritage-500" />
-              <span>Heritage Map</span>
+              <span>{t('heritageMap')}</span>
             </Link>
 
             <Link
@@ -64,7 +66,19 @@ export default function Navbar({ onOpenPostModal, onOpenMenu }) {
               }`}
             >
               <ShoppingBag className="w-4 h-4 text-orange-500" />
-              <span>ODOP Bazaar</span>
+              <span>{t('odopBazaar')}</span>
+            </Link>
+
+            <Link
+              to="/artisan-portal"
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                isActive('/artisan-portal')
+                  ? 'bg-amber-100 text-amber-900 shadow-sm border border-amber-300'
+                  : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
+              }`}
+            >
+              <Store className="w-4 h-4 text-amber-600" />
+              <span>{lang === 'hi' ? 'कारीगर मंच' : 'Artisan Studio'}</span>
             </Link>
 
             {user && (
@@ -97,13 +111,41 @@ export default function Navbar({ onOpenPostModal, onOpenMenu }) {
           </nav>
 
           {/* Action Buttons (Right) */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-2 lg:gap-3">
+            {/* Language Switcher Pill */}
+            <button
+              onClick={toggleLanguage}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 transition-colors shadow-2xs"
+              title="Switch Language / भाषा बदलें"
+            >
+              <Languages className="w-3.5 h-3.5 text-heritage-600" />
+              <span>{lang === 'en' ? '🇮🇳 हिन्दी' : '🇬🇧 English'}</span>
+            </button>
+
+            {/* ASI Monument QR Scanner Button */}
+            <button
+              onClick={onOpenQRScanner}
+              className="p-2 rounded-full border border-stone-200 hover:border-heritage-400 bg-stone-50 hover:bg-heritage-50 text-stone-700 hover:text-heritage-600 transition-colors"
+              title={lang === 'hi' ? 'स्मारक क्यूआर स्कैन करें' : 'Scan Monument QR'}
+            >
+              <QrCode className="w-4 h-4" />
+            </button>
+
+            {/* Heritage Passport Badges */}
+            <button
+              onClick={onOpenPassport}
+              className="p-2 rounded-full border border-amber-200 hover:border-amber-400 bg-amber-50/80 hover:bg-amber-100 text-amber-800 transition-colors"
+              title={lang === 'hi' ? 'धरोहर पासपोर्ट एवं पदक' : 'Heritage Passport & Badges'}
+            >
+              <Shield className="w-4 h-4" />
+            </button>
+
             <button
               onClick={onOpenPostModal}
               className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold bg-stone-900 hover:bg-heritage-600 text-white shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
             >
               <Camera className="w-4 h-4" />
-              <span>Post Visit</span>
+              <span>{t('postVisit')}</span>
             </button>
 
             {user ? (
@@ -134,20 +176,47 @@ export default function Navbar({ onOpenPostModal, onOpenMenu }) {
                   className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium text-stone-700 hover:text-heritage-600 hover:bg-stone-100 transition-colors"
                 >
                   <LogIn className="w-4 h-4" />
-                  <span>Login</span>
+                  <span>{t('login')}</span>
                 </Link>
                 <Link
                   to="/register"
                   className="px-4 py-2 rounded-full text-sm font-medium bg-heritage-500 hover:bg-heritage-600 text-white transition-colors"
                 >
-                  Join
+                  {t('join')}
                 </Link>
               </div>
             )}
           </div>
 
-          {/* Mobile Menu Button */}
-          <div className="flex md:hidden items-center gap-2">
+          {/* Mobile Action Controls */}
+          <div className="flex md:hidden items-center gap-1.5">
+            {/* Quick Language Toggle */}
+            <button
+              onClick={toggleLanguage}
+              className="p-2 rounded-full border border-stone-200 bg-stone-50 text-xs font-bold text-stone-700"
+              title="Toggle Language"
+            >
+              <Languages className="w-4 h-4 text-heritage-600" />
+            </button>
+
+            {/* Quick QR Scanner */}
+            <button
+              onClick={onOpenQRScanner}
+              className="p-2 rounded-full border border-stone-200 bg-stone-50 text-stone-700"
+              title="Scan QR"
+            >
+              <QrCode className="w-4 h-4" />
+            </button>
+
+            {/* Quick Passport */}
+            <button
+              onClick={onOpenPassport}
+              className="p-2 rounded-full border border-amber-200 bg-amber-50 text-amber-800"
+              title="Passport"
+            >
+              <Shield className="w-4 h-4" />
+            </button>
+
             <button
               onClick={onOpenPostModal}
               className="p-2 rounded-full bg-heritage-500 text-white shadow-sm"
@@ -191,6 +260,14 @@ export default function Navbar({ onOpenPostModal, onOpenMenu }) {
           >
             <ShoppingBag className="w-5 h-5 text-orange-500" />
             ODOP Bazaar
+          </Link>
+          <Link
+            to="/artisan-portal"
+            onClick={() => setMobileMenuOpen(false)}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-amber-900 bg-amber-50 hover:bg-amber-100 font-bold"
+          >
+            <Store className="w-5 h-5 text-amber-600" />
+            {lang === 'hi' ? 'कारीगर मंच (Artisan Studio)' : 'Artisan & Trader Studio'}
           </Link>
           {user && (
             <Link

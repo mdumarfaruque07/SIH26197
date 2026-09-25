@@ -3,6 +3,7 @@ import { placeService, postService } from '../services/api';
 import { getLiveLocation } from '../utils/geolocation';
 import CultureCard from '../components/CultureCard';
 import HeritageRadar from '../components/HeritageRadar';
+import { useLanguage } from '../context/LanguageContext';
 import {
   Compass,
   MapPin,
@@ -13,18 +14,12 @@ import {
   Users,
   AlertCircle,
   Camera,
+  QrCode,
+  Shield,
 } from 'lucide-react';
 
-const CATEGORIES = [
-  { id: 'all', label: 'All Heritage' },
-  { id: 'monument', label: 'Monuments' },
-  { id: 'temple', label: 'Ancient Temples' },
-  { id: 'fort', label: 'Royal Forts' },
-  { id: 'festival', label: 'Festivals & Ghats' },
-  { id: 'natural', label: 'Natural Heritage' },
-];
-
-export default function FeedPage({ onOpenPostModal }) {
+export default function FeedPage({ onOpenPostModal, onOpenQRScanner, onOpenPassport }) {
+  const { lang, t } = useLanguage();
   const [places, setPlaces] = useState([]);
   const [feedPosts, setFeedPosts] = useState([]);
   const [category, setCategory] = useState('all');
@@ -33,6 +28,14 @@ export default function FeedPage({ onOpenPostModal }) {
   const [userLocation, setUserLocation] = useState(null);
   const [locating, setLocating] = useState(false);
   const [locationStatus, setLocationStatus] = useState('');
+
+  const CATEGORIES = [
+    { id: 'all', label: lang === 'hi' ? 'सभी धरोहर' : 'All Heritage' },
+    { id: 'monument', label: lang === 'hi' ? 'ऐतिहासिक स्मारक' : 'Monuments' },
+    { id: 'temple', label: lang === 'hi' ? 'प्राचीन मंदिर' : 'Ancient Temples' },
+    { id: 'fort', label: lang === 'hi' ? 'शाही किले' : 'Royal Forts' },
+    { id: 'festival', label: lang === 'hi' ? 'संस्कृति एवं घाट' : 'Living Culture & Ghats' },
+  ];
 
   const fetchPlaces = async (lat = null, lng = null) => {
     setLoading(true);
@@ -87,17 +90,21 @@ export default function FeedPage({ onOpenPostModal }) {
 
   const requestGeolocation = async () => {
     setLocating(true);
-    setLocationStatus('Detecting your GPS location...');
+    setLocationStatus(lang === 'hi' ? 'निकटतम धरोहर स्थल खोजे जा रहे हैं...' : 'Finding nearest heritage sites...');
 
     try {
       const loc = await getLiveLocation();
       const coords = { lat: loc.lat, lng: loc.lng };
       setUserLocation(coords);
-      setLocationStatus(`Sorted by distance from ${loc.label || 'your location'}`);
+      if (loc.city) {
+        setLocationStatus(lang === 'hi' ? `${loc.city} के निकट धरोहर स्थल` : `Heritage sites near ${loc.city}`);
+      } else {
+        setLocationStatus(lang === 'hi' ? 'आपकी लोकेशन के अनुसार धरोहर स्थल' : 'Heritage sites sorted by proximity');
+      }
       fetchPlaces(coords.lat, coords.lng);
     } catch (err) {
-      console.warn('Geolocation resolver failed:', err);
-      setLocationStatus('Showing curated pan-India heritage sites.');
+      console.warn('Geolocation resolver notice:', err);
+      setLocationStatus('');
     } finally {
       setLocating(false);
     }
@@ -159,10 +166,10 @@ export default function FeedPage({ onOpenPostModal }) {
           </div>
 
           {locationStatus && (
-            <p className="text-xs text-heritage-300/90 font-medium animate-pulse flex items-center justify-center gap-1.5">
-              <AlertCircle className="w-3.5 h-3.5" />
-              {locationStatus}
-            </p>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-xs text-heritage-200 font-medium">
+              <MapPin className="w-3.5 h-3.5 text-heritage-400" />
+              <span>{locationStatus}</span>
+            </div>
           )}
         </div>
       </section>
@@ -186,6 +193,25 @@ export default function FeedPage({ onOpenPostModal }) {
           ))}
         </div>
 
+        {/* High-Impact Innovation Feature Action Pills */}
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <button
+            onClick={onOpenQRScanner}
+            className="p-3 rounded-2xl bg-heritage-600 hover:bg-heritage-500 text-white shadow-sm flex items-center justify-center gap-2 hover:scale-[1.01] transition-all text-xs font-semibold"
+          >
+            <QrCode className="w-4 h-4 text-white" />
+            <span>{lang === 'hi' ? 'एएसआई स्मारक क्यूआर' : 'Scan Monument QR'}</span>
+          </button>
+
+          <button
+            onClick={onOpenPassport}
+            className="p-3 rounded-2xl bg-amber-700 hover:bg-amber-600 text-white shadow-sm flex items-center justify-center gap-2 hover:scale-[1.01] transition-all text-xs font-semibold"
+          >
+            <Shield className="w-4 h-4 text-amber-200" />
+            <span>{lang === 'hi' ? 'संस्कृति धरोहर पासपोर्ट' : 'Heritage Passport & Badges'}</span>
+          </button>
+        </div>
+
         {/* Content Layout: Feed Grid (Left) + Community Stream (Right) */}
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Heritage Places Feed (2 Cols) */}
@@ -193,10 +219,14 @@ export default function FeedPage({ onOpenPostModal }) {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="font-serif text-2xl font-bold text-stone-900">
-                  {userLocation ? 'Closest Heritage Sites' : 'Featured Culture Feed'}
+                  {userLocation
+                    ? (lang === 'hi' ? 'निकटतम सांस्कृतिक धरोहर स्थल' : 'Closest Heritage Sites')
+                    : (lang === 'hi' ? 'प्रमुख सांस्कृतिक धरोहर फ़ीड' : 'Featured Culture Feed')}
                 </h2>
                 <p className="text-xs text-stone-500 mt-0.5">
-                  Showing {places.length} curated cultural heritage destinations across India
+                  {lang === 'hi'
+                    ? `पूरे भारत के ${places.length} प्रमुख सांस्कृतिक स्थल`
+                    : `Showing ${places.length} curated cultural heritage destinations across India`}
                 </p>
               </div>
 
@@ -209,7 +239,7 @@ export default function FeedPage({ onOpenPostModal }) {
                   }}
                   className="text-xs font-semibold text-heritage-600 hover:underline"
                 >
-                  Reset Location
+                  {lang === 'hi' ? 'रीसेट करें' : 'Reset Location'}
                 </button>
               )}
             </div>
@@ -231,7 +261,10 @@ export default function FeedPage({ onOpenPostModal }) {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {places.map((place) => (
-                  <CultureCard key={place.id} place={place} />
+                  <CultureCard
+                    key={place.id}
+                    place={place}
+                  />
                 ))}
               </div>
             )}
@@ -332,7 +365,10 @@ export default function FeedPage({ onOpenPostModal }) {
 
       {/* Floating Heritage Radar Widget */}
       {places.length > 0 && (
-        <HeritageRadar nearestPlace={places[0]} userLocation={userLocation} />
+        <HeritageRadar
+          nearestPlace={places[0]}
+          userLocation={userLocation}
+        />
       )}
     </div>
   );

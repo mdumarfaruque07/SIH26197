@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { LanguageProvider } from './context/LanguageContext';
 import Navbar from './components/Navbar';
 import FeedPage from './pages/FeedPage';
 import MapPage from './pages/MapPage';
 import PlaceDetailPage from './pages/PlaceDetailPage';
 import BookmarksPage from './pages/BookmarksPage';
 import BazaarPage from './pages/BazaarPage';
+import ArtisanPortalPage from './pages/ArtisanPortalPage';
 import AdminPage from './pages/AdminPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -15,6 +17,8 @@ import BottomNav from './components/BottomNav';
 import MenuDrawer from './components/MenuDrawer';
 import SearchModal from './components/SearchModal';
 import PermissionModal from './components/PermissionModal';
+import QRScannerModal from './components/QRScannerModal';
+import PassportModal from './components/PassportModal';
 import { Landmark, Heart } from 'lucide-react';
 
 function AppContent() {
@@ -23,6 +27,10 @@ function AppContent() {
   const [postModalPlaceId, setPostModalPlaceId] = useState(null);
   const [menuDrawerOpen, setMenuDrawerOpen] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
+
+  // New High-Impact Feature Modals
+  const [qrScannerOpen, setQrScannerOpen] = useState(false);
+  const [passportOpen, setPassportOpen] = useState(false);
 
   const handleOpenPostModal = (placeId = null) => {
     setPostModalPlaceId(placeId);
@@ -44,18 +52,34 @@ function AppContent() {
       <Navbar
         onOpenPostModal={() => handleOpenPostModal()}
         onOpenMenu={() => setMenuDrawerOpen(true)}
+        onOpenQRScanner={() => setQrScannerOpen(true)}
+        onOpenPassport={() => setPassportOpen(true)}
       />
 
       {/* Main App Screens */}
       <main className={`flex-1 ${isAuthPage ? '' : 'pb-16 md:pb-0'}`}>
         <Routes>
-          <Route path="/" element={<FeedPage onOpenPostModal={handleOpenPostModal} />} />
+          <Route
+            path="/"
+            element={
+              <FeedPage
+                onOpenPostModal={handleOpenPostModal}
+                onOpenQRScanner={() => setQrScannerOpen(true)}
+                onOpenPassport={() => setPassportOpen(true)}
+              />
+            }
+          />
           <Route path="/map" element={<MapPage />} />
           <Route
             path="/place/:slug"
-            element={<PlaceDetailPage onOpenPostModal={handleOpenPostModal} />}
+            element={
+              <PlaceDetailPage
+                onOpenPostModal={handleOpenPostModal}
+              />
+            }
           />
           <Route path="/bazaar" element={<BazaarPage />} />
+          <Route path="/artisan-portal" element={<ArtisanPortalPage />} />
           <Route path="/bookmarks" element={<BookmarksPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/login" element={<LoginPage />} />
@@ -80,19 +104,30 @@ function AppContent() {
       )}
 
       {/* Mobile Ergonomic Bottom Navigation Bar - strictly hidden on auth screens */}
-      {!isAuthPage && <BottomNav onOpenSearch={() => setSearchModalOpen(true)} />}
+      {!isAuthPage && (
+        <BottomNav
+          onOpenSearch={() => setSearchModalOpen(true)}
+          onOpenPassport={() => setPassportOpen(true)}
+        />
+      )}
 
       {/* Mobile Sliding Menu Drawer */}
       <MenuDrawer
         isOpen={menuDrawerOpen}
         onClose={() => setMenuDrawerOpen(false)}
         onOpenPostModal={handleOpenPostModal}
+        onOpenQRScanner={() => setQrScannerOpen(true)}
+        onOpenPassport={() => setPassportOpen(true)}
       />
 
       {/* Quick Search Modal */}
       <SearchModal
         isOpen={searchModalOpen}
         onClose={() => setSearchModalOpen(false)}
+        onOpenQRScanner={() => {
+          setSearchModalOpen(false);
+          setQrScannerOpen(true);
+        }}
       />
 
       {/* Global Post Visit Photo & Rating Modal */}
@@ -104,16 +139,30 @@ function AppContent() {
           window.location.reload();
         }}
       />
+
+      {/* ASI Monument QR Code Scanner Modal */}
+      <QRScannerModal
+        isOpen={qrScannerOpen}
+        onClose={() => setQrScannerOpen(false)}
+      />
+
+      {/* Sanskriti Heritage Passport & Cultural Badges */}
+      <PassportModal
+        isOpen={passportOpen}
+        onClose={() => setPassportOpen(false)}
+      />
     </div>
   );
 }
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <AppContent />
-      </BrowserRouter>
-    </AuthProvider>
+    <LanguageProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <AppContent />
+        </BrowserRouter>
+      </AuthProvider>
+    </LanguageProvider>
   );
 }

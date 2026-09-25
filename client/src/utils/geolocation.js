@@ -31,7 +31,7 @@ export async function getLiveLocation() {
         lng: pos.coords.longitude,
         accuracy: pos.coords.accuracy,
         source: 'gps',
-        label: `GPS (${pos.coords.latitude.toFixed(2)}, ${pos.coords.longitude.toFixed(2)})`,
+        label: 'Live Location',
       };
     }
   } catch (capErr) {
@@ -54,7 +54,7 @@ export async function getLiveLocation() {
           lat: htmlPos.coords.latitude,
           lng: htmlPos.coords.longitude,
           source: 'browser',
-          label: `Browser (${htmlPos.coords.latitude.toFixed(2)}, ${htmlPos.coords.longitude.toFixed(2)})`,
+          label: 'Live Location',
         };
       }
     } catch (htmlErr) {
@@ -77,7 +77,7 @@ export async function getLiveLocation() {
           lng: data.longitude,
           city: data.city || data.region,
           source: 'ip',
-          label: `${data.city || 'Regional'} (Network IP)`,
+          label: data.city || 'Local Area',
         };
       }
     }
@@ -91,6 +91,6 @@ export async function getLiveLocation() {
     lng: 77.209,
     city: 'New Delhi',
     source: 'default',
-    label: 'Pan-India Explorer (Default)',
+    label: 'India',
   };
 }

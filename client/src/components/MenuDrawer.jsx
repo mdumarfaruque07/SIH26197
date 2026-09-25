@@ -18,12 +18,16 @@ import {
   Check,
   AlertTriangle,
   RefreshCw,
+  QrCode,
+  Shield,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { getApiBaseUrl, updateApiBaseUrl, checkServerHealth } from '../services/api';
 
-export default function MenuDrawer({ isOpen, onClose, onOpenPostModal }) {
+export default function MenuDrawer({ isOpen, onClose, onOpenPostModal, onOpenQRScanner, onOpenPassport }) {
   const { user, logout, isGuest } = useAuth();
+  const { lang, toggleLanguage, t } = useLanguage();
   const navigate = useNavigate();
 
   const [serverUrl, setServerUrl] = useState(
@@ -112,13 +116,27 @@ export default function MenuDrawer({ isOpen, onClose, onOpenPostModal }) {
 
           {/* Navigation Links */}
           <div className="space-y-1">
+            {/* Language Switcher Bar */}
+            <button
+              onClick={toggleLanguage}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold bg-stone-100 text-stone-800 hover:bg-stone-200 transition-colors mb-2"
+            >
+              <div className="flex items-center gap-2.5">
+                <Languages className="w-4 h-4 text-heritage-600" />
+                <span>{lang === 'hi' ? 'भाषा: हिंदी' : 'Language: English'}</span>
+              </div>
+              <span className="text-[10px] font-bold text-heritage-600 uppercase bg-white px-2 py-0.5 rounded-full border border-stone-200">
+                {lang === 'hi' ? 'English' : 'हिंदी'}
+              </span>
+            </button>
+
             <Link
               to="/"
               onClick={onClose}
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-stone-700 hover:bg-stone-100 transition-colors"
             >
               <Compass className="w-4 h-4 text-heritage-600" />
-              <span>Culture Feed</span>
+              <span>{t('cultureFeed')}</span>
             </Link>
 
             <Link
@@ -127,7 +145,7 @@ export default function MenuDrawer({ isOpen, onClose, onOpenPostModal }) {
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-stone-700 hover:bg-stone-100 transition-colors"
             >
               <Compass className="w-4 h-4 text-orange-600" />
-              <span>Interactive Map Radar</span>
+              <span>{t('heritageMap')}</span>
             </Link>
 
             <Link
@@ -136,8 +154,41 @@ export default function MenuDrawer({ isOpen, onClose, onOpenPostModal }) {
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-stone-700 hover:bg-stone-100 transition-colors"
             >
               <ShoppingBag className="w-4 h-4 text-indigo-600" />
-              <span>ODOP Traditional Bazaar</span>
+              <span>{t('odopBazaar')}</span>
             </Link>
+
+            <Link
+              to="/artisan-portal"
+              onClick={onClose}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-stone-700 hover:bg-stone-100 transition-colors"
+            >
+              <Sparkles className="w-4 h-4 text-orange-600" />
+              <span>{lang === 'hi' ? 'कारीगर एवं विक्रेता केंद्र' : 'Artisan & Trader Studio'}</span>
+            </Link>
+
+            {/* Quick QR Scanner Link */}
+            <button
+              onClick={() => {
+                onClose();
+                if (onOpenQRScanner) onOpenQRScanner();
+              }}
+              className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-stone-700 hover:bg-stone-100 transition-colors"
+            >
+              <QrCode className="w-4 h-4 text-heritage-600" />
+              <span>{lang === 'hi' ? 'एएसआई स्मारक क्यूआर स्कैनर' : 'Scan Monument QR'}</span>
+            </button>
+
+            {/* Heritage Passport Link */}
+            <button
+              onClick={() => {
+                onClose();
+                if (onOpenPassport) onOpenPassport();
+              }}
+              className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-amber-900 bg-amber-50/70 border border-amber-200/80 hover:bg-amber-100 transition-colors"
+            >
+              <Shield className="w-4 h-4 text-amber-600" />
+              <span>{lang === 'hi' ? 'संस्कृति धरोहर पासपोर्ट' : 'Heritage Passport & Badges'}</span>
+            </button>
 
             <Link
               to="/bookmarks"
@@ -145,7 +196,7 @@ export default function MenuDrawer({ isOpen, onClose, onOpenPostModal }) {
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-stone-700 hover:bg-stone-100 transition-colors"
             >
               <Bookmark className="w-4 h-4 text-amber-600" />
-              <span>Saved Bucket List</span>
+              <span>{t('savedBucketList')}</span>
             </Link>
 
             {user?.role === 'admin' && (
@@ -183,75 +234,77 @@ export default function MenuDrawer({ isOpen, onClose, onOpenPostModal }) {
             </p>
           </div>
 
-          {/* Backend Connection Manager for Mobile */}
-          <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/90 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Server className="w-3.5 h-3.5 text-stone-600" />
-                <span className="text-xs font-bold text-stone-800">Cloud Sync & Server</span>
-              </div>
-              <span
-                className={`inline-flex items-center gap-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
-                  serverStatus === 'online'
-                    ? 'bg-emerald-100 text-emerald-800'
-                    : serverStatus === 'offline'
-                    ? 'bg-amber-100 text-amber-800'
-                    : 'bg-stone-200 text-stone-600'
-                }`}
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    serverStatus === 'online'
-                      ? 'bg-emerald-500 animate-pulse'
-                      : serverStatus === 'offline'
-                      ? 'bg-amber-500'
-                      : 'bg-stone-400'
-                  }`}
-                />
-                {serverStatus === 'online'
-                  ? 'Online'
-                  : serverStatus === 'offline'
-                  ? 'Offline Fallback'
-                  : 'Checking'}
-              </span>
-            </div>
-
-            <p className="text-[10px] text-stone-500 font-mono truncate">{serverUrl}</p>
-
-            <button
-              onClick={() => setShowServerConfig(!showServerConfig)}
-              className="text-[11px] text-heritage-600 hover:text-heritage-700 font-semibold"
-            >
-              {showServerConfig ? 'Close Settings' : 'Configure Server IP'}
-            </button>
-
-            {showServerConfig && (
-              <div className="pt-2 space-y-2 border-t border-stone-200">
-                <input
-                  type="text"
-                  value={serverUrl}
-                  onChange={(e) => setServerUrl(e.target.value)}
-                  placeholder="e.g. http://10.168.182.153:5000"
-                  className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs font-mono"
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleSaveServer}
-                    className="flex-1 py-1.5 bg-heritage-600 text-white rounded-lg text-xs font-bold hover:bg-heritage-700"
-                  >
-                    Save & Test
-                  </button>
-                  <button
-                    onClick={() => checkConnection()}
-                    className="p-1.5 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-100"
-                    title="Refresh Status"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                  </button>
+          {/* Backend Connection Manager for Admin only */}
+          {user?.role === 'admin' && (
+            <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/90 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Server className="w-3.5 h-3.5 text-stone-600" />
+                  <span className="text-xs font-bold text-stone-800">Cloud Sync & Server</span>
                 </div>
+                <span
+                  className={`inline-flex items-center gap-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                    serverStatus === 'online'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : serverStatus === 'offline'
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-stone-200 text-stone-600'
+                  }`}
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      serverStatus === 'online'
+                        ? 'bg-emerald-500 animate-pulse'
+                        : serverStatus === 'offline'
+                        ? 'bg-amber-500'
+                        : 'bg-stone-400'
+                    }`}
+                  />
+                  {serverStatus === 'online'
+                    ? 'Online'
+                    : serverStatus === 'offline'
+                    ? 'Offline Fallback'
+                    : 'Checking'}
+                </span>
               </div>
-            )}
-          </div>
+
+              <p className="text-[10px] text-stone-500 font-mono truncate">{serverUrl}</p>
+
+              <button
+                onClick={() => setShowServerConfig(!showServerConfig)}
+                className="text-[11px] text-heritage-600 hover:text-heritage-700 font-semibold"
+              >
+                {showServerConfig ? 'Close Settings' : 'Configure Server IP'}
+              </button>
+
+              {showServerConfig && (
+                <div className="pt-2 space-y-2 border-t border-stone-200">
+                  <input
+                    type="text"
+                    value={serverUrl}
+                    onChange={(e) => setServerUrl(e.target.value)}
+                    placeholder="e.g. http://10.168.182.153:5000"
+                    className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs font-mono"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSaveServer}
+                      className="flex-1 py-1.5 bg-heritage-600 text-white rounded-lg text-xs font-bold hover:bg-heritage-700"
+                    >
+                      Save & Test
+                    </button>
+                    <button
+                      onClick={() => checkConnection()}
+                      className="p-1.5 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-100"
+                      title="Refresh Status"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer Auth Actions */}

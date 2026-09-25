@@ -184,10 +184,14 @@ export const productService = {
   getAll: async (params) => {
     try {
       const res = await api.get('/products', { params });
-      return res.data;
+      // Merge with locally added artisan products if any
+      const localProducts = JSON.parse(localStorage.getItem('sih_custom_products') || '[]');
+      let combined = [...localProducts, ...(res.data.products || [])];
+      return { success: true, count: combined.length, products: combined };
     } catch (err) {
       console.warn('Backend /products failed, using fallback ODOP products:', err.message);
-      let list = [...FALLBACK_PRODUCTS];
+      const localProducts = JSON.parse(localStorage.getItem('sih_custom_products') || '[]');
+      let list = [...localProducts, ...FALLBACK_PRODUCTS];
       if (params?.category && params.category !== 'all') {
         list = list.filter((p) => p.category === params.category);
       }
@@ -196,8 +200,8 @@ export const productService = {
         list = list.filter(
           (p) =>
             p.name.toLowerCase().includes(q) ||
-            p.odopTag.toLowerCase().includes(q) ||
-            p.artisanName.toLowerCase().includes(q)
+            p.odopTag?.toLowerCase().includes(q) ||
+            p.artisanName?.toLowerCase().includes(q)
         );
       }
       return { success: true, count: list.length, products: list, isOfflineFallback: true };
@@ -206,9 +210,16 @@ export const productService = {
   getByPlace: async (placeId) => {
     try {
       const res = await api.get(`/products/place/${placeId}`);
-      return res.data;
+      const localProducts = JSON.parse(localStorage.getItem('sih_custom_products') || '[]').filter(
+        (p) => p.placeId === Number(placeId)
+      );
+      const combined = [...localProducts, ...(res.data.products || [])];
+      return { success: true, products: combined };
     } catch (err) {
-      const list = FALLBACK_PRODUCTS.filter((p) => p.placeId === Number(placeId));
+      const localProducts = JSON.parse(localStorage.getItem('sih_custom_products') || '[]').filter(
+        (p) => p.placeId === Number(placeId)
+      );
+      const list = [...localProducts, ...FALLBACK_PRODUCTS.filter((p) => p.placeId === Number(placeId))];
       return { success: true, count: list.length, products: list, isOfflineFallback: true };
     }
   },
@@ -217,9 +228,30 @@ export const productService = {
       const res = await api.get(`/products/${id}`);
       return res.data;
     } catch (err) {
-      const product = FALLBACK_PRODUCTS.find((p) => p.id === Number(id));
+      const localProducts = JSON.parse(localStorage.getItem('sih_custom_products') || '[]');
+      const product = [...localProducts, ...FALLBACK_PRODUCTS].find((p) => p.id === Number(id));
       if (product) return { success: true, product, isOfflineFallback: true };
       throw err;
+    }
+  },
+  create: async (data) => {
+    try {
+      const res = await api.post('/products', data);
+      return res.data;
+    } catch (err) {
+      console.warn('Backend POST /products failed, persisting to local artisan store:', err.message);
+      const localProducts = JSON.parse(localStorage.getItem('sih_custom_products') || '[]');
+      const newProduct = {
+        id: Date.now(),
+        ...data,
+        price: parseFloat(data.price),
+        placeId: parseInt(data.placeId),
+        rating: 5.0,
+        createdAt: new Date().toISOString(),
+      };
+      localProducts.unshift(newProduct);
+      localStorage.setItem('sih_custom_products', JSON.stringify(localProducts));
+      return { success: true, product: newProduct, isOfflineFallback: true };
     }
   },
 };

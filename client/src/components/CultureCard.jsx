@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Star, Compass, ArrowRight, Eye } from 'lucide-react';
+import { MapPin, Star, Compass, ArrowRight, Eye, Video } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 const categoryColors = {
   monument: 'bg-amber-100 text-amber-800 border-amber-200',
@@ -8,10 +9,15 @@ const categoryColors = {
   fort: 'bg-stone-200 text-stone-800 border-stone-300',
   festival: 'bg-rose-100 text-rose-800 border-rose-200',
   natural: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  culture: 'bg-purple-100 text-purple-800 border-purple-200',
 };
 
 export default function CultureCard({ place }) {
+  const { lang, t } = useLanguage();
   const badgeStyle = categoryColors[place.category] || 'bg-stone-100 text-stone-800 border-stone-200';
+
+  const displayName = lang === 'hi' && place.nameHi ? place.nameHi : place.name;
+  const displayDescription = lang === 'hi' && place.shortDescriptionHi ? place.shortDescriptionHi : place.shortDescription;
 
   return (
     <div className="group bg-white rounded-2xl overflow-hidden border border-stone-200/90 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col hover:-translate-y-1">
@@ -19,7 +25,7 @@ export default function CultureCard({ place }) {
       <div className="relative aspect-[16/10] overflow-hidden bg-stone-100">
         <img
           src={place.coverImage}
-          alt={place.name}
+          alt={displayName}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
           loading="lazy"
           onError={(e) => {
@@ -30,7 +36,7 @@ export default function CultureCard({ place }) {
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
         {/* Top Badges Row */}
-        <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 z-10 pointer-events-none">
+        <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 z-10">
           <span
             className={`text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border shadow-sm backdrop-blur-md truncate max-w-[50%] ${badgeStyle}`}
           >
@@ -40,7 +46,7 @@ export default function CultureCard({ place }) {
           {place.distanceKm !== null && place.distanceKm !== undefined && (
             <div className="bg-black/75 backdrop-blur-md text-white text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm border border-white/20 flex-shrink-0">
               <Compass className="w-3.5 h-3.5 text-heritage-400" />
-              <span>{place.distanceKm} km away</span>
+              <span>{place.distanceKm} km {lang === 'hi' ? 'दूर' : 'away'}</span>
             </div>
           )}
         </div>
@@ -54,7 +60,7 @@ export default function CultureCard({ place }) {
             </div>
           )}
           <h3 className="font-serif text-xl font-bold leading-snug drop-shadow-sm group-hover:text-heritage-300 transition-colors line-clamp-1">
-            {place.name}
+            {displayName}
           </h3>
         </div>
       </div>
@@ -67,20 +73,20 @@ export default function CultureCard({ place }) {
             <div className="flex items-center gap-1 text-amber-600 font-semibold">
               <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
               <span>{place.rating || 5.0}</span>
-              <span className="text-stone-400 font-normal">({place.postsCount || 0} reviews)</span>
+              <span className="text-stone-400 font-normal">({place.postsCount || 0} {lang === 'hi' ? 'समीक्षाएं' : 'reviews'})</span>
             </div>
             <Link
               to={`/map?lat=${place.latitude}&lng=${place.longitude}`}
               className="text-stone-500 hover:text-heritage-600 flex items-center gap-1 transition-colors"
             >
               <Eye className="w-3.5 h-3.5" />
-              <span>View on Map</span>
+              <span>{lang === 'hi' ? 'मानचित्र पर देखें' : 'View on Map'}</span>
             </Link>
           </div>
 
           {/* Short description */}
           <p className="text-stone-600 text-sm mt-3 line-clamp-2 leading-relaxed">
-            {place.shortDescription}
+            {displayDescription}
           </p>
         </div>
 
@@ -89,7 +95,7 @@ export default function CultureCard({ place }) {
           to={`/place/${place.slug}`}
           className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-heritage-50 hover:bg-heritage-600 text-heritage-700 hover:text-white font-medium text-sm transition-all duration-200 group-hover:shadow-sm"
         >
-          <span>Explore Story & Videos</span>
+          <span>{lang === 'hi' ? 'धरोहर कथा एवं ओडीओपी शिल्प' : 'Explore Story & Crafts'}</span>
           <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
         </Link>
       </div>
