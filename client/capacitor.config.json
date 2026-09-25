@@ -1,0 +1,12 @@
+{
+  "appId": "com.sanskritikhoj.app",
+  "appName": "Sanskriti Khoj",
+  "webDir": "dist",
+  "server": {
+    "cleartext": true,
+    "androidScheme": "http"
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}

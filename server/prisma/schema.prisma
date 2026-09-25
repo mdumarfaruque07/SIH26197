@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int        @id @default(autoincrement())
+  name         String
+  email        String     @unique
+  passwordHash String     @map("password_hash")
+  role         String     @default("user") // 'user' or 'admin'
+  avatarUrl    String?    @map("avatar_url")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  posts        Post[]
+  bookmarks    Bookmark[]
+
+  @@map("users")
+}
+
+model Place {
+  id               Int         @id @default(autoincrement())
+  name             String
+  slug             String      @unique
+  category         String      // 'monument', 'temple', 'fort', 'festival', 'natural'
+  state            String?
+  shortDescription String      @db.VarChar(500) @map("short_description")
+  fullStory        String      @db.Text @map("full_story")
+  latitude         Float
+  longitude        Float
+  coverImage       String      @map("cover_image")
+  youtubeVideoId   String?     @map("youtube_video_id")
+  audioNarrationUrl String?    @map("audio_narration_url")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  mediaLinks       MediaLink[]
+  posts            Post[]
+  bookmarks        Bookmark[]
+  products         Product[]
+
+  @@map("places")
+}
+
+model MediaLink {
+  id           Int     @id @default(autoincrement())
+  placeId      Int     @map("place_id")
+  place        Place   @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  type         String  // 'movie', 'song', 'documentary'
+  title        String
+  youtubeUrl   String  @map("youtube_url")
+  thumbnailUrl String? @map("thumbnail_url")
+
+  @@map("media_links")
+}
+
+model Post {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @map("user_id")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  placeId    Int      @map("place_id")
+  place      Place    @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  rating     Int      @default(5)
+  caption    String?  @db.Text
+  imageUrl   String   @map("image_url")
+  isApproved Boolean  @default(true) @map("is_approved")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("posts")
+}
+
+model Bookmark {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  placeId   Int      @map("place_id")
+  place     Place    @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  visited   Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, placeId])
+  @@map("bookmarks")
+}
+
+model Product {
+  id          Int      @id @default(autoincrement())
+  placeId     Int      @map("place_id")
+  place       Place    @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  name        String
+  description String   @db.Text
+  price       Float
+  imageUrl    String   @map("image_url")
+  artisanName String   @map("artisan_name")
+  odopTag     String?  @map("odop_tag")
+  category    String   // 'handicraft', 'attire', 'painting', 'pottery', 'souvenir'
+  rating      Float    @default(4.8)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("products")
+}
