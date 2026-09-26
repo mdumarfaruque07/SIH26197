@@ -21,7 +21,18 @@ function getSanitizedDatabaseUrl() {
           } catch {
             safePass = encodeURIComponent(rawPass);
           }
-          return `mysql://${user}:${safePass}@${hostPart}`;
+          let finalHost = hostPart;
+          if (!finalHost.includes('connect_timeout=')) {
+            finalHost += (finalHost.includes('?') ? '&' : '?') + 'connect_timeout=30';
+          }
+          if (!finalHost.includes('pool_timeout=')) {
+            finalHost += '&pool_timeout=30';
+          }
+          if (!finalHost.includes('connection_limit=')) {
+            finalHost += '&connection_limit=10';
+          }
+
+          return `mysql://${user}:${safePass}@${finalHost}`;
         }
       }
     } catch (e) {

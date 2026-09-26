@@ -11,6 +11,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import supportRoutes from './routes/supportRoutes.js';
 import foodRoutes from './routes/foodRoutes.js';
+import artisanRoutes from './routes/artisanRoutes.js';
 
 dotenv.config();
 
@@ -52,6 +53,7 @@ app.use('/api/posts', postRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/food', foodRoutes);
 app.use('/api/support', supportRoutes);
+app.use('/api/artisan-verification', artisanRoutes);
 app.use('/api/admin', adminRoutes);
 
 // 404 Handler
