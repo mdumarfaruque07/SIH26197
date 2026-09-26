@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Compass, Map, Search, ShoppingBag, Bookmark } from 'lucide-react';
+import { Compass, Map, Search, ShoppingBag, User } from 'lucide-react';
 import { useKeyboardVisible } from '../hooks/useKeyboardVisible';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -45,9 +45,9 @@ export default function BottomNav({ onOpenSearch }) {
       badge: 'ODOP',
     },
     {
-      to: '/bookmarks',
-      label: lang === 'hi' ? 'सहेजे' : 'Saved',
-      icon: Bookmark,
+      to: '/profile',
+      label: lang === 'hi' ? 'प्रोफ़ाइल' : 'Profile',
+      icon: User,
     },
   ];
 

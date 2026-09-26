@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { MapPin, Compass, Camera, ShieldCheck, LogIn, LogOut, User, Menu, X, Landmark, Bookmark, ShoppingBag, Languages, QrCode, Shield, Store } from 'lucide-react';
+import { MapPin, Compass, Camera, ShieldCheck, LogIn, LogOut, User, Menu, X, Landmark, Bookmark, ShoppingBag, Languages, Store } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 
-export default function Navbar({ onOpenPostModal, onOpenMenu, onOpenQRScanner, onOpenPassport }) {
+export default function Navbar({ onOpenPostModal, onOpenMenu }) {
   const { user, logout, isAdmin } = useAuth();
   const { lang, toggleLanguage, t } = useLanguage();
   const location = useLocation();
@@ -22,11 +22,12 @@ export default function Navbar({ onOpenPostModal, onOpenMenu, onOpenQRScanner, o
               <Landmark className="w-5 h-5" />
             </div>
             <div>
-              <div className="font-serif text-2xl font-bold tracking-tight text-stone-900 group-hover:text-heritage-600 transition-colors">
-                {lang === 'hi' ? 'संस्कृति खोज' : 'संस्कृति'} <span className="text-heritage-600 font-sans text-lg font-semibold">{lang === 'hi' ? '' : 'Khoj'}</span>
+              <div className="font-serif text-2xl font-bold tracking-tight text-stone-900 group-hover:text-heritage-600 transition-colors flex items-center gap-0.5">
+                <span>{lang === 'hi' ? 'संस्कृति' : 'Sanskriti'}</span>
+                <span className="text-amber-600 font-sans text-xl font-extrabold tracking-tight">GO</span>
               </div>
-              <p className="text-[10px] text-stone-600 font-medium tracking-wider uppercase -mt-1">
-                {t('portalSubtitle')}
+              <p className="text-[10px] text-stone-500 font-semibold tracking-wider uppercase -mt-0.5">
+                {lang === 'hi' ? 'खोजें • अनुभव करें • समर्थन करें' : 'Discover • Experience • Support'}
               </p>
             </div>
           </Link>
@@ -122,23 +123,15 @@ export default function Navbar({ onOpenPostModal, onOpenMenu, onOpenQRScanner, o
               <span>{lang === 'en' ? '🇮🇳 हिन्दी' : '🇬🇧 English'}</span>
             </button>
 
-            {/* ASI Monument QR Scanner Button */}
-            <button
-              onClick={onOpenQRScanner}
-              className="p-2 rounded-full border border-stone-200 hover:border-heritage-400 bg-stone-50 hover:bg-heritage-50 text-stone-700 hover:text-heritage-600 transition-colors"
-              title={lang === 'hi' ? 'स्मारक क्यूआर स्कैन करें' : 'Scan Monument QR'}
+            {/* User Profile & Settings Pill */}
+            <Link
+              to="/profile"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold border border-stone-200 bg-stone-50 hover:bg-amber-50 hover:border-amber-300 text-stone-700 transition-colors shadow-2xs"
+              title="Profile & Settings"
             >
-              <QrCode className="w-4 h-4" />
-            </button>
-
-            {/* Heritage Passport Badges */}
-            <button
-              onClick={onOpenPassport}
-              className="p-2 rounded-full border border-amber-200 hover:border-amber-400 bg-amber-50/80 hover:bg-amber-100 text-amber-800 transition-colors"
-              title={lang === 'hi' ? 'धरोहर पासपोर्ट एवं पदक' : 'Heritage Passport & Badges'}
-            >
-              <Shield className="w-4 h-4" />
-            </button>
+              <User className="w-3.5 h-3.5 text-amber-600" />
+              <span>{lang === 'hi' ? 'प्रोफ़ाइल' : 'Profile'}</span>
+            </Link>
 
             <button
               onClick={onOpenPostModal}
@@ -150,7 +143,11 @@ export default function Navbar({ onOpenPostModal, onOpenMenu, onOpenQRScanner, o
 
             {user ? (
               <div className="flex items-center gap-3 pl-2 border-l border-stone-200">
-                <div className="flex items-center gap-2">
+                <Link
+                  to="/profile"
+                  className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                  title="View & Edit Profile"
+                >
                   <img
                     src={user.avatarUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${user.name}`}
                     alt={user.name}
@@ -160,7 +157,7 @@ export default function Navbar({ onOpenPostModal, onOpenMenu, onOpenQRScanner, o
                     <p className="text-xs font-semibold text-stone-900 leading-none">{user.name}</p>
                     <span className="text-[10px] text-stone-600 uppercase font-medium">{user.role}</span>
                   </div>
-                </div>
+                </Link>
                 <button
                   onClick={logout}
                   title="Logout"
@@ -199,23 +196,14 @@ export default function Navbar({ onOpenPostModal, onOpenMenu, onOpenQRScanner, o
               <Languages className="w-4 h-4 text-heritage-600" />
             </button>
 
-            {/* Quick QR Scanner */}
-            <button
-              onClick={onOpenQRScanner}
+            {/* Quick Profile Link */}
+            <Link
+              to="/profile"
               className="p-2 rounded-full border border-stone-200 bg-stone-50 text-stone-700"
-              title="Scan QR"
+              title="My Profile & Settings"
             >
-              <QrCode className="w-4 h-4" />
-            </button>
-
-            {/* Quick Passport */}
-            <button
-              onClick={onOpenPassport}
-              className="p-2 rounded-full border border-amber-200 bg-amber-50 text-amber-800"
-              title="Passport"
-            >
-              <Shield className="w-4 h-4" />
-            </button>
+              <User className="w-4 h-4 text-amber-600" />
+            </Link>
 
             <button
               onClick={onOpenPostModal}

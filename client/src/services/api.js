@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { FALLBACK_PLACES, FALLBACK_PRODUCTS } from '../data/fallbackData';
+import { FALLBACK_PLACES, FALLBACK_PRODUCTS, FALLBACK_FOODS } from '../data/fallbackData';
 
 export const getApiBaseUrl = () => {
   const custom = localStorage.getItem('sih_custom_api_url');
@@ -236,16 +236,55 @@ export const productService = {
   },
   create: async (data) => {
     try {
-      const res = await api.post('/products', data);
+      const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
+      const res = await api.post('/products', data, {
+        headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : undefined,
+      });
       return res.data;
     } catch (err) {
       console.warn('Backend POST /products failed, persisting to local artisan store:', err.message);
       const localProducts = JSON.parse(localStorage.getItem('sih_custom_products') || '[]');
+      const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
+      const name = isFormData ? data.get('name') : data.name;
+      const price = isFormData ? data.get('price') : data.price;
+      const placeId = isFormData ? data.get('placeId') : data.placeId;
+      const artisanName = isFormData ? data.get('artisanName') : data.artisanName;
+      const odopTag = isFormData ? data.get('odopTag') : data.odopTag;
+      const category = isFormData ? data.get('category') : data.category;
+      const description = isFormData ? data.get('description') : data.description;
+      const shopName = isFormData ? data.get('shopName') : data.shopName;
+      const shopAddress = isFormData ? data.get('shopAddress') : data.shopAddress;
+      const shopLandmark = isFormData ? data.get('shopLandmark') : data.shopLandmark;
+      const shopTiming = isFormData ? data.get('shopTiming') : data.shopTiming;
+      const phone = isFormData ? data.get('phone') : data.phone;
+      const whatsapp = isFormData ? data.get('whatsapp') : data.whatsapp;
+      const mapQuery = isFormData ? data.get('mapQuery') : data.mapQuery;
+      const listingTier = (isFormData ? data.get('listingTier') : data.listingTier) || 'Gold Verified Partner';
+      const imageUrl = isFormData
+        ? data.get('imageUrl') ||
+          'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=800&q=80'
+        : data.imageUrl ||
+          'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=800&q=80';
+
       const newProduct = {
         id: Date.now(),
-        ...data,
-        price: parseFloat(data.price),
-        placeId: parseInt(data.placeId),
+        name,
+        artisanName,
+        shopName: shopName || `${artisanName} Heritage Studio`,
+        shopAddress: shopAddress || 'Heritage Craft Cluster, Near Monument',
+        shopLandmark: shopLandmark || 'Near Monument Gate',
+        shopTiming: shopTiming || '10:00 AM - 08:00 PM (Daily)',
+        phone: phone || '+91 98765 43210',
+        whatsapp: whatsapp || (phone ? phone.replace(/[^0-9]/g, '') : '919876543210'),
+        mapQuery: mapQuery || `${shopName || artisanName} Heritage Craft`,
+        listingTier,
+        isVerifiedShop: true,
+        odopTag,
+        category,
+        description,
+        imageUrl,
+        price: parseFloat(price) || 0,
+        placeId: parseInt(placeId) || 1,
         rating: 5.0,
         createdAt: new Date().toISOString(),
       };
@@ -253,6 +292,243 @@ export const productService = {
       localStorage.setItem('sih_custom_products', JSON.stringify(localProducts));
       return { success: true, product: newProduct, isOfflineFallback: true };
     }
+  },
+};
+
+export const foodService = {
+  getAll: async (params) => {
+    try {
+      const res = await api.get('/food', { params });
+      if (res.data?.foods && res.data.foods.length > 0) {
+        return res.data;
+      }
+      return { success: true, count: FALLBACK_FOODS.length, foods: FALLBACK_FOODS };
+    } catch (err) {
+      console.warn('Backend /food failed, using cached culinary heritage guide:', err.message);
+      let list = [...FALLBACK_FOODS];
+      if (params?.placeId) {
+        const pid = Number(params.placeId);
+        list = list.filter((f) => f.placeId === pid || (f.alternatePlaceIds && f.alternatePlaceIds.includes(pid)));
+      }
+      if (params?.diet && params.diet !== 'all') {
+        list = list.filter((f) => f.diet === params.diet);
+      }
+      if (params?.search) {
+        const q = params.search.toLowerCase();
+        list = list.filter(
+          (f) =>
+            f.name.toLowerCase().includes(q) ||
+            (f.nameHi && f.nameHi.includes(q)) ||
+            f.monumentName.toLowerCase().includes(q) ||
+            f.famousSpots.toLowerCase().includes(q)
+        );
+      }
+      return { success: true, count: list.length, foods: list, isOfflineFallback: true };
+    }
+  },
+  getByPlace: async (placeId, options = {}) => {
+    try {
+      const res = await api.get(`/food/place/${placeId}`, { params: options });
+      if (res.data?.foods && res.data.foods.length > 0) {
+        return res.data;
+      }
+      const pid = Number(placeId);
+      const list = FALLBACK_FOODS.filter(
+        (f) =>
+          f.placeId === pid ||
+          (f.alternatePlaceIds && f.alternatePlaceIds.includes(pid)) ||
+          (options.slug && f.monumentSlug && f.monumentSlug.includes(options.slug)) ||
+          (options.name && f.monumentName && f.monumentName.toLowerCase().includes(options.name.toLowerCase()))
+      );
+      return { success: true, count: list.length, foods: list };
+    } catch (err) {
+      console.warn(`Backend /food/place/${placeId} failed, using cached culinary data:`, err.message);
+      const pid = Number(placeId);
+      const list = FALLBACK_FOODS.filter(
+        (f) =>
+          f.placeId === pid ||
+          (f.alternatePlaceIds && f.alternatePlaceIds.includes(pid)) ||
+          (options.slug && f.monumentSlug && f.monumentSlug.includes(options.slug)) ||
+          (options.name && f.monumentName && f.monumentName.toLowerCase().includes(options.name.toLowerCase()))
+      );
+      return { success: true, count: list.length, foods: list, isOfflineFallback: true };
+    }
+  },
+  create: async (data) => {
+    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
+    const res = await api.post('/food', data, {
+      headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : undefined,
+    });
+    return res.data;
+  },
+  delete: async (id) => {
+    const res = await api.delete(`/food/${id}`);
+    return res.data;
+  },
+};
+
+export const INITIAL_ARTISAN_APPLICATIONS = [
+  {
+    id: 'APP-AGR-44910',
+    artisanName: 'Ustad Rashid & Sons',
+    shopName: 'Ustad Rashid Heritage Marble & Inlay Workshop',
+    shopAddress: '23/45, Taj Ganj Heritage Walkway, Near Fatehpuri Gate, Agra, UP - 282001',
+    shopLandmark: '120m from Taj Mahal South/East Gate Walkway',
+    shopTiming: '09:00 AM - 09:00 PM (Closed Fridays)',
+    placeId: 1,
+    monumentName: 'Taj Mahal, Agra',
+    phone: '+91 98371 99882',
+    whatsapp: '+919837199882',
+    pehchanId: 'UP-AGR-44910',
+    cooperativeName: 'Agra Marble Artisans Welfare Cooperative',
+    clusterLocation: 'Taj Ganj Heritage Cluster, Agra (282001)',
+    odopTag: 'ODOP: Agra Marble Inlay',
+    giRegNumber: 'GI-IND-2026-UP-1092',
+    craftType: 'Makrana Marble Inlay / Pietra Dura',
+    status: 'APPROVED',
+    submissionDate: '2026-09-24',
+    approvedDate: '2026-09-25',
+    adminNote: 'Verified with DC (Handicrafts) Registry & Taj Ganj Cluster Field Audit. Approved for Gold Partner.',
+    activePlan: 'gold',
+  },
+  {
+    id: 'APP-VAR-10842',
+    artisanName: 'Haji Mohammad & Weavers Union',
+    shopName: 'Kashi Bunkar Heritage Silk & Brocade Guild',
+    shopAddress: 'D-14/19, Madanpura Heritage Weavers Gali, Near Dashashwamedh, Varanasi - 221001',
+    shopLandmark: '350m from Dashashwamedh Ghat & Kashi Vishwanath Temple',
+    shopTiming: '10:00 AM - 08:30 PM (Daily)',
+    placeId: 2,
+    monumentName: 'Varanasi Ghats & Kashi Vishwanath',
+    phone: '+91 94152 77102',
+    whatsapp: '+919415277102',
+    pehchanId: 'UP-VAR-10842',
+    cooperativeName: 'All India Handloom Weavers Cooperative Federation',
+    clusterLocation: 'Madanpura Silk Cluster, Varanasi (221001)',
+    odopTag: 'ODOP: Banarasi Brocade & Silk',
+    giRegNumber: 'GI-IND-2026-UP-0412',
+    craftType: 'Pure Mulberry Silk & Real Zari Weaving',
+    status: 'PENDING',
+    submissionDate: '2026-09-26',
+    adminNote: 'Pehchan ID valid. Awaiting physical workshop proximity audit report.',
+    activePlan: null,
+  },
+  {
+    id: 'APP-JPR-20419',
+    artisanName: 'Master Kripal Kumbhar Guild',
+    shopName: 'Master Kripal Heritage Blue Art Pottery',
+    shopAddress: 'B-12, Kot Jewar Heritage Crafts Lane, Near Badi Chaupar, Jaipur - 302001',
+    shopLandmark: '400m from Hawa Mahal & City Palace',
+    shopTiming: '10:00 AM - 08:00 PM (Closed Sundays)',
+    placeId: 3,
+    monumentName: 'Hawa Mahal & Amber Fort, Jaipur',
+    phone: '+91 98290 33419',
+    whatsapp: '+919829033419',
+    pehchanId: 'RJ-JPR-20419',
+    cooperativeName: 'Rajasthan Small Industries Handicrafts Union',
+    clusterLocation: 'Kot Jewar Pottery Cluster, Jaipur (302001)',
+    odopTag: 'ODOP: Jaipur Blue Pottery',
+    giRegNumber: 'GI-IND-2026-RJ-0028',
+    craftType: 'Jaipur Blue Pottery (Traditional Quartz & Multani Mitti)',
+    status: 'PENDING',
+    submissionDate: '2026-09-26',
+    adminNote: 'Application submitted. DIC Jaipur reference verified.',
+    activePlan: null,
+  },
+];
+
+export const artisanVerificationService = {
+  getAll: async () => {
+    try {
+      const stored = localStorage.getItem('sih_artisan_applications');
+      if (stored) {
+        return { success: true, applications: JSON.parse(stored) };
+      }
+      localStorage.setItem('sih_artisan_applications', JSON.stringify(INITIAL_ARTISAN_APPLICATIONS));
+      return { success: true, applications: INITIAL_ARTISAN_APPLICATIONS };
+    } catch (e) {
+      return { success: true, applications: INITIAL_ARTISAN_APPLICATIONS };
+    }
+  },
+
+  getByPehchan: async (pehchanId) => {
+    const res = await artisanVerificationService.getAll();
+    const app = res.applications.find(
+      (a) => (a.pehchanId || '').toUpperCase() === (pehchanId || '').toUpperCase()
+    );
+    return { success: true, application: app || null };
+  },
+
+  submit: async (applicationData) => {
+    const res = await artisanVerificationService.getAll();
+    const list = [...res.applications];
+    const cleanId = (applicationData.pehchanId || 'ART').replace(/[^A-Z0-9]/gi, '');
+    const newId = `APP-${cleanId}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const newApp = {
+      ...applicationData,
+      id: newId,
+      status: 'PENDING',
+      submissionDate: new Date().toISOString().split('T')[0],
+      adminNote: 'Pending physical workshop and credentials audit by Tourism Administration.',
+      activePlan: null,
+    };
+
+    const existingIdx = list.findIndex(
+      (a) => (a.pehchanId || '').toUpperCase() === (applicationData.pehchanId || '').toUpperCase()
+    );
+    if (existingIdx >= 0) {
+      list[existingIdx] = { ...list[existingIdx], ...newApp };
+    } else {
+      list.unshift(newApp);
+    }
+
+    localStorage.setItem('sih_artisan_applications', JSON.stringify(list));
+    localStorage.setItem('sih_current_artisan_pehchan', applicationData.pehchanId);
+    return { success: true, application: newApp };
+  },
+
+  updateStatus: async (id, status, adminNote = '') => {
+    const res = await artisanVerificationService.getAll();
+    const list = res.applications.map((app) => {
+      if (app.id === id || app.pehchanId === id) {
+        return {
+          ...app,
+          status,
+          adminNote:
+            adminNote ||
+            (status === 'APPROVED'
+              ? 'Approved by Government Tourism Administration.'
+              : 'Application rejected. Please update details.'),
+          approvedDate: status === 'APPROVED' ? new Date().toISOString().split('T')[0] : app.approvedDate,
+        };
+      }
+      return app;
+    });
+    localStorage.setItem('sih_artisan_applications', JSON.stringify(list));
+    return { success: true, applications: list };
+  },
+
+  updatePlan: async (pehchanId, plan) => {
+    const res = await artisanVerificationService.getAll();
+    const list = res.applications.map((app) => {
+      if ((app.pehchanId || '').toUpperCase() === (pehchanId || '').toUpperCase()) {
+        return {
+          ...app,
+          activePlan: plan,
+        };
+      }
+      return app;
+    });
+    localStorage.setItem('sih_artisan_applications', JSON.stringify(list));
+    return { success: true };
+  },
+
+  getCurrentArtisanPehchan: () => {
+    return localStorage.getItem('sih_current_artisan_pehchan') || 'UP-AGR-44910';
+  },
+
+  setCurrentArtisanPehchan: (pehchanId) => {
+    localStorage.setItem('sih_current_artisan_pehchan', pehchanId);
   },
 };
 

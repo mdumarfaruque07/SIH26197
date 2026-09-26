@@ -25,13 +25,22 @@ export function AuthProvider({ children }) {
         .finally(() => setLoading(false));
     } else {
       if (localStorage.getItem('sih_heritage_guest') === 'true') {
-        setUser({
+        const defaultGuest = {
           id: 0,
           name: 'Guest Tourist',
           email: 'guest@sanskriti.local',
           role: 'guest',
+          bio: 'Exploring incredible heritage sites and traditions across India',
+          city: 'New Delhi',
+          phone: '',
           avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-        });
+        };
+        try {
+          const saved = localStorage.getItem('sih_custom_profile');
+          setUser(saved ? { ...defaultGuest, ...JSON.parse(saved) } : defaultGuest);
+        } catch {
+          setUser(defaultGuest);
+        }
       }
       setLoading(false);
     }
@@ -41,7 +50,12 @@ export function AuthProvider({ children }) {
     const data = await authService.login({ email, password });
     if (data.success) {
       localStorage.setItem('sih_heritage_token', data.token);
-      setUser(data.user);
+      let userData = data.user;
+      try {
+        const saved = localStorage.getItem('sih_custom_profile');
+        if (saved) userData = { ...userData, ...JSON.parse(saved) };
+      } catch {}
+      setUser(userData);
       return data;
     }
     throw new Error(data.message || 'Login failed');
@@ -64,18 +78,40 @@ export function AuthProvider({ children }) {
   const continueAsGuest = () => {
     setIsGuest(true);
     localStorage.setItem('sih_heritage_guest', 'true');
-    setUser({
+    const defaultGuest = {
       id: 0,
       name: 'Guest Tourist',
       email: 'guest@sanskriti.local',
       role: 'guest',
+      bio: 'Exploring incredible heritage sites and traditions across India',
+      city: 'New Delhi',
+      phone: '',
       avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+    };
+    try {
+      const saved = localStorage.getItem('sih_custom_profile');
+      setUser(saved ? { ...defaultGuest, ...JSON.parse(saved) } : defaultGuest);
+    } catch {
+      setUser(defaultGuest);
+    }
+  };
+
+  const updateProfile = (updatedData) => {
+    setUser((prev) => {
+      const next = { ...(prev || {}), ...updatedData };
+      try {
+        localStorage.setItem('sih_custom_profile', JSON.stringify(next));
+      } catch (e) {
+        console.warn('Could not save custom profile:', e);
+      }
+      return next;
     });
   };
 
   const logout = () => {
     localStorage.removeItem('sih_heritage_token');
     localStorage.removeItem('sih_heritage_guest');
+    localStorage.removeItem('sih_custom_profile');
     setIsGuest(false);
     setUser(null);
   };
@@ -87,6 +123,7 @@ export function AuthProvider({ children }) {
         loading,
         login,
         register,
+        updateProfile,
         logout,
         isGuest,
         continueAsGuest,

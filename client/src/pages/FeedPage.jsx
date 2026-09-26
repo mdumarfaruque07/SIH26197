@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { placeService, postService } from '../services/api';
 import { getLiveLocation } from '../utils/geolocation';
 import CultureCard from '../components/CultureCard';
@@ -14,11 +15,65 @@ import {
   Users,
   AlertCircle,
   Camera,
-  QrCode,
-  Shield,
+  Calendar,
 } from 'lucide-react';
 
-export default function FeedPage({ onOpenPostModal, onOpenQRScanner, onOpenPassport }) {
+const CULTURAL_FESTIVALS = [
+  {
+    id: 1,
+    name: 'Dev Deepawali & Maha Ganga Aarti',
+    nameHi: 'देव दीपावली एवं महा गंगा आरती',
+    location: 'Varanasi Ghats, Uttar Pradesh',
+    locationHi: 'वाराणसी घाट, उत्तर प्रदेश',
+    date: 'Kartik Purnima',
+    dateHi: 'कार्तिक पूर्णिमा',
+    badge: 'Sacred River Festival',
+    badgeHi: 'पवित्र जल महोत्सव',
+    image: 'https://images.unsplash.com/photo-1561361513-2d000a50f0dc?auto=format&fit=crop&w=600&q=80',
+    slug: 'varanasi-ghats',
+  },
+  {
+    id: 2,
+    name: 'Konark Dance & Music Festival',
+    nameHi: 'कोणार्क शास्त्रीय नृत्य महोत्सव',
+    location: 'Sun Temple, Odisha',
+    locationHi: 'सूर्य मंदिर, ओडिशा',
+    date: '1st - 5th December',
+    dateHi: '1 - 5 दिसम्बर',
+    badge: 'Classical Natya Utsav',
+    badgeHi: 'शास्त्रीय नृत्य उत्सव',
+    image: 'https://images.unsplash.com/photo-1605649487212-47bdab064df7?auto=format&fit=crop&w=600&q=80',
+    slug: 'konark-sun-temple',
+  },
+  {
+    id: 3,
+    name: 'Taj Mahotsav Artisan Carnival',
+    nameHi: 'ताज महोत्सव एवं शिल्प मेला',
+    location: 'Shilpgram, Agra, UP',
+    locationHi: 'शिल्पग्राम, आगरा, उत्तर प्रदेश',
+    date: '18th - 27th February',
+    dateHi: '18 - 27 फ़रवरी',
+    badge: 'Craft & Cultural Fair',
+    badgeHi: 'शिल्प व सांस्कृतिक मेला',
+    image: 'https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=600&q=80',
+    slug: 'taj-mahal',
+  },
+  {
+    id: 4,
+    name: 'Chithirai Thiruvizha Chariot Utsav',
+    nameHi: 'चित्तिरै ब्रह्मोत्सव',
+    location: 'Meenakshi Temple, Madurai',
+    locationHi: 'मीनाक्षी मंदिर, मदुरै',
+    date: 'April - May',
+    dateHi: 'अप्रैल - मई',
+    badge: 'Temple Chariot Festival',
+    badgeHi: 'भव्य रथ यात्रा',
+    image: 'https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=600&q=80',
+    slug: 'meenakshi-amman-temple',
+  },
+];
+
+export default function FeedPage({ onOpenPostModal }) {
   const { lang, t } = useLanguage();
   const [places, setPlaces] = useState([]);
   const [feedPosts, setFeedPosts] = useState([]);
@@ -193,24 +248,6 @@ export default function FeedPage({ onOpenPostModal, onOpenQRScanner, onOpenPassp
           ))}
         </div>
 
-        {/* High-Impact Innovation Feature Action Pills */}
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <button
-            onClick={onOpenQRScanner}
-            className="p-3 rounded-2xl bg-heritage-600 hover:bg-heritage-500 text-white shadow-sm flex items-center justify-center gap-2 hover:scale-[1.01] transition-all text-xs font-semibold"
-          >
-            <QrCode className="w-4 h-4 text-white" />
-            <span>{lang === 'hi' ? 'एएसआई स्मारक क्यूआर' : 'Scan Monument QR'}</span>
-          </button>
-
-          <button
-            onClick={onOpenPassport}
-            className="p-3 rounded-2xl bg-amber-700 hover:bg-amber-600 text-white shadow-sm flex items-center justify-center gap-2 hover:scale-[1.01] transition-all text-xs font-semibold"
-          >
-            <Shield className="w-4 h-4 text-amber-200" />
-            <span>{lang === 'hi' ? 'संस्कृति धरोहर पासपोर्ट' : 'Heritage Passport & Badges'}</span>
-          </button>
-        </div>
 
         {/* Content Layout: Feed Grid (Left) + Community Stream (Right) */}
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -270,8 +307,62 @@ export default function FeedPage({ onOpenPostModal, onOpenQRScanner, onOpenPassp
             )}
           </div>
 
-          {/* Right Sidebar: Community Visitor Photos & Reviews */}
+          {/* Right Sidebar: Upcoming Festivals & Visitor Feed */}
           <div className="space-y-6">
+            {/* Festivals & Cultural Events Card */}
+            <div className="bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-3.5">
+              <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-serif text-base font-bold text-stone-900">
+                      {lang === 'hi' ? 'आगामी सांस्कृतिक उत्सव' : 'Cultural Festivals & Events'}
+                    </h3>
+                    <p className="text-[11px] text-stone-500">
+                      {lang === 'hi' ? 'जीवंत मेले, आरती व नृत्य उत्सव' : 'Upcoming living fairs, Aarti & dance utsavs'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2.5">
+                {CULTURAL_FESTIVALS.map((fest) => (
+                  <Link
+                    key={fest.id}
+                    to={`/place/${fest.slug}`}
+                    className="group block p-2.5 rounded-2xl bg-stone-50/80 hover:bg-rose-50/50 border border-stone-200/70 hover:border-rose-300 transition-all"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <img
+                        src={fest.image}
+                        alt={fest.name}
+                        className="w-12 h-12 rounded-xl object-cover border border-stone-200 group-hover:scale-105 transition-transform"
+                        loading="lazy"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-[9px] font-bold text-rose-700 uppercase tracking-wider bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200/60">
+                            {lang === 'hi' ? fest.dateHi : fest.date}
+                          </span>
+                          <span className="text-[10px] font-medium text-stone-600 truncate">
+                            {lang === 'hi' ? fest.badgeHi : fest.badge}
+                          </span>
+                        </div>
+                        <h4 className="font-bold text-xs text-stone-900 group-hover:text-rose-800 transition-colors mt-0.5 truncate">
+                          {lang === 'hi' ? fest.nameHi : fest.name}
+                        </h4>
+                        <p className="text-[10px] text-stone-500 truncate">
+                          📍 {lang === 'hi' ? fest.locationHi : fest.location}
+                        </p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
             <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-stone-100">
                 <div className="flex items-center gap-2">

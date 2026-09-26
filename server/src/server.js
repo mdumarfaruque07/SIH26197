@@ -9,6 +9,8 @@ import placeRoutes from './routes/placeRoutes.js';
 import postRoutes from './routes/postRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import productRoutes from './routes/productRoutes.js';
+import supportRoutes from './routes/supportRoutes.js';
+import foodRoutes from './routes/foodRoutes.js';
 
 dotenv.config();
 
@@ -48,6 +50,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/places', placeRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/food', foodRoutes);
+app.use('/api/support', supportRoutes);
 app.use('/api/admin', adminRoutes);
 
 // 404 Handler

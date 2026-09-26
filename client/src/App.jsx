@@ -9,6 +9,7 @@ import PlaceDetailPage from './pages/PlaceDetailPage';
 import BookmarksPage from './pages/BookmarksPage';
 import BazaarPage from './pages/BazaarPage';
 import ArtisanPortalPage from './pages/ArtisanPortalPage';
+import ProfilePage from './pages/ProfilePage';
 import AdminPage from './pages/AdminPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -17,8 +18,6 @@ import BottomNav from './components/BottomNav';
 import MenuDrawer from './components/MenuDrawer';
 import SearchModal from './components/SearchModal';
 import PermissionModal from './components/PermissionModal';
-import QRScannerModal from './components/QRScannerModal';
-import PassportModal from './components/PassportModal';
 import { Landmark, Heart } from 'lucide-react';
 
 function AppContent() {
@@ -27,10 +26,6 @@ function AppContent() {
   const [postModalPlaceId, setPostModalPlaceId] = useState(null);
   const [menuDrawerOpen, setMenuDrawerOpen] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
-
-  // New High-Impact Feature Modals
-  const [qrScannerOpen, setQrScannerOpen] = useState(false);
-  const [passportOpen, setPassportOpen] = useState(false);
 
   const handleOpenPostModal = (placeId = null) => {
     setPostModalPlaceId(placeId);
@@ -52,8 +47,6 @@ function AppContent() {
       <Navbar
         onOpenPostModal={() => handleOpenPostModal()}
         onOpenMenu={() => setMenuDrawerOpen(true)}
-        onOpenQRScanner={() => setQrScannerOpen(true)}
-        onOpenPassport={() => setPassportOpen(true)}
       />
 
       {/* Main App Screens */}
@@ -64,8 +57,6 @@ function AppContent() {
             element={
               <FeedPage
                 onOpenPostModal={handleOpenPostModal}
-                onOpenQRScanner={() => setQrScannerOpen(true)}
-                onOpenPassport={() => setPassportOpen(true)}
               />
             }
           />
@@ -81,6 +72,7 @@ function AppContent() {
           <Route path="/bazaar" element={<BazaarPage />} />
           <Route path="/artisan-portal" element={<ArtisanPortalPage />} />
           <Route path="/bookmarks" element={<BookmarksPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
@@ -93,7 +85,7 @@ function AppContent() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <Landmark className="w-5 h-5 text-heritage-500" />
-              <span className="font-serif text-lg font-bold text-white">संस्कृति Khoj</span>
+              <span className="font-serif text-lg font-bold text-white">Sanskriti<span className="text-amber-500 font-sans font-extrabold">GO</span></span>
               <span className="text-xs text-stone-400">| National Heritage & Artisan Ecosystem</span>
             </div>
             <p className="text-xs flex items-center gap-1.5 text-stone-400">
@@ -107,7 +99,6 @@ function AppContent() {
       {!isAuthPage && (
         <BottomNav
           onOpenSearch={() => setSearchModalOpen(true)}
-          onOpenPassport={() => setPassportOpen(true)}
         />
       )}
 
@@ -116,18 +107,12 @@ function AppContent() {
         isOpen={menuDrawerOpen}
         onClose={() => setMenuDrawerOpen(false)}
         onOpenPostModal={handleOpenPostModal}
-        onOpenQRScanner={() => setQrScannerOpen(true)}
-        onOpenPassport={() => setPassportOpen(true)}
       />
 
       {/* Quick Search Modal */}
       <SearchModal
         isOpen={searchModalOpen}
         onClose={() => setSearchModalOpen(false)}
-        onOpenQRScanner={() => {
-          setSearchModalOpen(false);
-          setQrScannerOpen(true);
-        }}
       />
 
       {/* Global Post Visit Photo & Rating Modal */}
@@ -138,18 +123,6 @@ function AppContent() {
         onSuccess={() => {
           window.location.reload();
         }}
-      />
-
-      {/* ASI Monument QR Code Scanner Modal */}
-      <QRScannerModal
-        isOpen={qrScannerOpen}
-        onClose={() => setQrScannerOpen(false)}
-      />
-
-      {/* Sanskriti Heritage Passport & Cultural Badges */}
-      <PassportModal
-        isOpen={passportOpen}
-        onClose={() => setPassportOpen(false)}
       />
     </div>
   );

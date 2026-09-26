@@ -105,15 +105,30 @@ export async function createProduct(req, res) {
       });
     }
 
+    if (category === 'food') {
+      return res.status(403).json({
+        success: false,
+        message: 'Food & Culinary Heritage can only be curated by Government Admins as non-deliverable tourist cultural lore.',
+      });
+    }
+
+    const combinedName = nameHi && nameHi.trim() ? `${name} (${nameHi.trim()})` : name;
+    const combinedDesc = descriptionHi && descriptionHi.trim()
+      ? `${description ? description.trim() + '\n\n' : ''}${descriptionHi.trim()}`
+      : (description || '');
+
+    let finalImageUrl = imageUrl;
+    if (req.file) {
+      finalImageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    }
+
     const product = await prisma.product.create({
       data: {
-        name,
-        nameHi: nameHi || null,
-        description: description || '',
-        descriptionHi: descriptionHi || null,
+        name: combinedName,
+        description: combinedDesc,
         price: parseFloat(price),
         imageUrl:
-          imageUrl ||
+          finalImageUrl ||
           'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=800&q=80',
         artisanName,
         odopTag: odopTag || 'ODOP Verified Heritage Craft',
