@@ -24,7 +24,7 @@ export default function Navbar({ onOpenPostModal, onOpenMenu }) {
             <div>
               <div className="font-serif text-2xl font-bold tracking-tight text-stone-900 group-hover:text-heritage-600 transition-colors flex items-center gap-0.5">
                 <span>{lang === 'hi' ? 'संस्कृति' : 'Sanskriti'}</span>
-                <span className="text-amber-600 font-sans text-xl font-extrabold tracking-tight">GO</span>
+                <span className="text-amber-600 font-sans text-xl font-extrabold tracking-tight">{lang === 'hi' ? 'खोज' : 'Khoj'}</span>
               </div>
               <p className="text-[10px] text-stone-500 font-semibold tracking-wider uppercase -mt-0.5">
                 {lang === 'hi' ? 'खोजें • अनुभव करें • समर्थन करें' : 'Discover • Experience • Support'}

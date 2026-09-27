@@ -410,7 +410,7 @@ export default function PlaceDetailPage({ onOpenPostModal }) {
 
       {/* Main Content Container */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 space-y-10">
-        {/* Anti-Misinformation Archival Integrity Stamp (Directly solving Slide 1 Challenge: Cultural Misinformation) */}
+        {/* Archival Integrity & Authenticity Details */}
         <div className="bg-emerald-950/5 border border-emerald-600/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
@@ -422,7 +422,7 @@ export default function PlaceDetailPage({ onOpenPostModal }) {
                   Verified Heritage Archive
                 </span>
                 <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold whitespace-nowrap">
-                  100% Authentic
+                  Archival Record
                 </span>
               </div>
               <p className="text-[11px] text-emerald-900/80 mt-0.5 leading-relaxed">
@@ -466,7 +466,7 @@ export default function PlaceDetailPage({ onOpenPostModal }) {
           </div>
         </section>
 
-        {/* 3. Curated 1-Day Heritage Trail & Guided Route (Slide 1: Premium cultural experiences & guided routes) */}
+        {/* 3. Curated 1-Day Heritage Trail & Guided Route */}
         <section className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200 shadow-sm space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-stone-100">
             <div className="flex items-center gap-2.5">
@@ -667,7 +667,7 @@ export default function PlaceDetailPage({ onOpenPostModal }) {
             <div className="p-3.5 rounded-2xl bg-white/90 border border-amber-200/70 text-xs text-stone-600 flex items-start gap-2.5 shadow-2xs">
               <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
               <span className="leading-relaxed">
-                <strong>Government Culinary Preservation Policy:</strong> To ensure authentic warmth, fresh preparation, and hygiene, regional food heritage items are curated strictly as an <strong>on-site tasting and tourism guide</strong>. These items are <strong>non-deliverable</strong>—tourists can explore their historical lore and relish them at the authentic heritage stalls and historic bazaars listed below during their visit!
+                <strong>Culinary Heritage Preservation:</strong> To ensure authentic taste, fresh preparation, and hygiene, regional food heritage items are curated strictly as an <strong>on-site tasting and tourism guide</strong>. These items are <strong>non-deliverable</strong>—tourists can explore their historical lore and relish them at the authentic heritage stalls and historic bazaars listed below during their visit!
               </span>
             </div>
 
@@ -919,7 +919,7 @@ export default function PlaceDetailPage({ onOpenPostModal }) {
           )}
         </section>
 
-        {/* 8. Data Security, Location Privacy & Archival Standards Notice (Slide 1 Challenge) */}
+        {/* Data Security & Location Privacy Notice */}
         <div className="p-4 sm:p-5 rounded-2xl bg-stone-900 text-stone-300 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs shadow-md border border-white/10">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0">
@@ -935,9 +935,9 @@ export default function PlaceDetailPage({ onOpenPostModal }) {
             </div>
           </div>
           <div className="flex items-center gap-2 text-[11px] font-semibold text-stone-400 whitespace-nowrap">
-            <span>Ministry of Tourism Partner</span>
+            <span>SanskritiKhoj Initiative</span>
             <span>•</span>
-            <span>Incredible India</span>
+            <span>National Heritage Registry</span>
           </div>
         </div>
       </div>

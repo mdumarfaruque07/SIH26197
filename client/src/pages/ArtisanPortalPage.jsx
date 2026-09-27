@@ -859,39 +859,34 @@ export default function ArtisanPortalPage() {
             </div>
           </div>
 
-          {/* ACTIVE SELLER PROFILE / WORKSHOP DEMO SWITCHER */}
+          {/* Active Artisan / Workshop Profile Header */}
           <div className="pt-2 max-w-2xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-white/10 p-3 rounded-2xl border border-white/20 backdrop-blur-md">
             <div className="flex items-center gap-2">
               <Store className="w-4 h-4 text-amber-400 shrink-0" />
               <div className="text-left">
                 <span className="text-[10px] text-amber-300 font-bold uppercase tracking-wider block">
-                  Active Artisan / Workshop:
+                  Artisan Studio:
                 </span>
                 <span className="text-xs font-semibold text-white">
-                  {currentApp?.shopName || formData.shopName}
+                  {currentApp?.shopName || formData.shopName || 'Registered Artisan Workshop'}
                 </span>
               </div>
             </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto">
-              <select
-                value={selectedProfilePehchan}
-                onChange={(e) => handleSwitchProfile(e.target.value)}
-                className="bg-stone-800 text-white text-xs font-semibold px-3 py-1.5 rounded-xl border border-stone-700 focus:outline-none focus:ring-1 focus:ring-amber-400 w-full sm:w-auto"
-              >
-                <option value="UP-AGR-44910">Ustad Rashid & Sons (Agra) • [APPROVED • Gold Partner]</option>
-                <option value="UP-VAR-10842">Kashi Bunkar Weavers (Varanasi) • [PENDING ADMIN APPROVAL]</option>
-                <option value="RJ-JPR-20419">Master Kripal Blue Pottery (Jaipur) • [PENDING ADMIN APPROVAL]</option>
-                <option value="NEW">+ Register New Artisan Workshop</option>
-              </select>
+              <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${
+                approvalStatus === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+              }`}>
+                {approvalStatus === 'APPROVED' ? '✓ Verified Guild' : '⏱ Verification Pending'}
+              </span>
 
               <button
                 type="button"
                 onClick={() => setShowOnboardingModal(true)}
-                className="px-2.5 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold whitespace-nowrap shadow-xs"
-                title="Register New Shop"
+                className="px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold whitespace-nowrap shadow-xs flex items-center gap-1"
+                title="Register New Workshop"
               >
-                + New
+                <span>+ Register Workshop</span>
               </button>
             </div>
           </div>
@@ -925,21 +920,10 @@ export default function ArtisanPortalPage() {
               </div>
 
               <div className="flex items-center gap-2 self-start sm:self-auto">
-                <button
-                  type="button"
-                  onClick={handleQuickApproveCurrent}
-                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all active:scale-95 flex items-center gap-1.5"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                  <span>Demo: Quick Approve as Admin</span>
-                </button>
-                <Link
-                  to="/admin"
-                  className="px-3.5 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold transition-all flex items-center gap-1.5"
-                >
-                  <span>Admin Panel</span>
-                  <ExternalLink className="w-3 h-3" />
-                </Link>
+                <span className="px-3.5 py-2 rounded-xl bg-amber-100 border border-amber-300 text-amber-900 text-xs font-semibold flex items-center gap-1.5 shadow-2xs">
+                  <Clock className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Verification in Progress</span>
+                </span>
               </div>
             </div>
 
@@ -1152,20 +1136,10 @@ export default function ArtisanPortalPage() {
               </p>
             </div>
             <div className="pt-2 flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={handleQuickApproveCurrent}
-                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md transition-all active:scale-95 flex items-center gap-1.5"
-              >
-                <Check className="w-3.5 h-3.5" />
-                <span>Demo: Quick Approve as Admin</span>
-              </button>
-              <Link
-                to="/admin"
-                className="px-4 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-bold transition-all"
-              >
-                Open Admin Panel (/admin)
-              </Link>
+              <span className="px-4 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-1.5 shadow-2xs">
+                <Clock className="w-3.5 h-3.5 text-amber-600" />
+                <span>Verification typically completes within 24-48 business hours</span>
+              </span>
             </div>
           </div>
         )}
@@ -1235,25 +1209,6 @@ export default function ArtisanPortalPage() {
               </div>
             </div>
 
-            {/* Quick Template Presets for Instant Demo */}
-            <div className="space-y-2 bg-stone-50 p-3.5 rounded-2xl border border-stone-200">
-              <span className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                <span>Quick Fill Verified Presets (Click any to load an authentic artisan with verified Pehchan credentials):</span>
-              </span>
-              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
-                {PRESET_IMAGE_TEMPLATES.map((preset, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleApplyPreset(preset)}
-                    className="px-2.5 py-1 rounded-lg bg-white hover:bg-amber-50 border border-stone-200 hover:border-amber-400 text-[11px] font-medium text-stone-700 whitespace-nowrap transition-colors flex items-center gap-1 shadow-2xs"
-                  >
-                    <span>{preset.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
 
             {/* Validation Error Alert */}
             {validationError && (
@@ -1703,7 +1658,7 @@ export default function ArtisanPortalPage() {
                     <div className="flex items-center gap-2">
                       <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
                       <span className="text-stone-800">
-                        <strong>100% In-Store Direct Payout:</strong> Customer pays <strong>₹{priceNum.toLocaleString('en-IN')}</strong> directly at your shop counter via Cash or UPI. SanskritiGO charges 0% sales commission.
+                        <strong>100% In-Store Direct Payout:</strong> Customer pays <strong>₹{priceNum.toLocaleString('en-IN')}</strong> directly at your shop counter via Cash or UPI. SanskritiKhoj charges 0% sales commission.
                       </span>
                     </div>
                     <span className="font-serif font-extrabold text-emerald-700 text-sm whitespace-nowrap pl-2">
@@ -2519,7 +2474,7 @@ export default function ArtisanPortalPage() {
 
                 <div className="pt-4 space-y-1">
                   <span className="text-[10px] font-extrabold text-orange-600 uppercase tracking-widest block">
-                    SanskritiGO • Digital Heritage Portal
+                    SanskritiKhoj • Digital Heritage Portal
                   </span>
                   <h3 className="font-serif text-lg font-extrabold text-stone-900">
                     {formData.shopName}
@@ -2896,7 +2851,7 @@ export default function ArtisanPortalPage() {
             <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-2 text-[10px] text-emerald-800 leading-relaxed">
               <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <span>
-                <strong>100% In-Store Direct Payout:</strong> Visiting tourists pay you directly at your shop counter (Cash/UPI). SanskritiGO deducts ₹0 platform cut.
+                <strong>100% In-Store Direct Payout:</strong> Visiting tourists pay you directly at your shop counter (Cash/UPI). SanskritiKhoj deducts ₹0 platform cut.
               </span>
             </div>
 

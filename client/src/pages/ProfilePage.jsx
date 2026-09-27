@@ -84,7 +84,7 @@ export default function ProfilePage() {
   const [expandedFaq, setExpandedFaq] = useState(null);
   const [myTickets, setMyTickets] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('sih_support_tickets') || '[]');
+      return JSON.parse(localStorage.getItem('sanskriti_support_tickets') || localStorage.getItem('sih_support_tickets') || '[]');
     } catch {
       return [];
     }
@@ -117,7 +117,7 @@ export default function ProfilePage() {
 
   // Form states
   const [name, setName] = useState(user?.name || 'Guest Tourist');
-  const [email, setEmail] = useState(user?.email || 'explorer@sanskritigo.in');
+  const [email, setEmail] = useState(user?.email || 'explorer@sanskritikhoj.in');
   const [phone, setPhone] = useState(user?.phone || '+91 98765 43210');
   const [city, setCity] = useState(user?.city || 'Bhopal, Madhya Pradesh');
   const [bio, setBio] = useState(
@@ -129,14 +129,14 @@ export default function ProfilePage() {
 
   // Preference states
   const [audioGuideSpeed, setAudioGuideSpeed] = useState(() => {
-    return localStorage.getItem('sih_audio_speed') || '1.0';
+    return localStorage.getItem('sanskriti_audio_speed') || localStorage.getItem('sih_audio_speed') || '1.0';
   });
   const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
-    const saved = localStorage.getItem('sih_radar_alerts');
+    const saved = localStorage.getItem('sanskriti_radar_alerts') || localStorage.getItem('sih_radar_alerts');
     return saved !== null ? saved === 'true' : true;
   });
   const [offlineCacheActive, setOfflineCacheActive] = useState(() => {
-    const saved = localStorage.getItem('sih_offline_cache');
+    const saved = localStorage.getItem('sanskriti_offline_cache') || localStorage.getItem('sih_offline_cache');
     return saved !== null ? saved === 'true' : true;
   });
 
@@ -150,19 +150,19 @@ export default function ProfilePage() {
 
   const handleSpeedChange = (spd) => {
     setAudioGuideSpeed(spd);
-    localStorage.setItem('sih_audio_speed', spd);
+    localStorage.setItem('sanskriti_audio_speed', spd);
   };
 
   const handleToggleCache = () => {
     const nextVal = !offlineCacheActive;
     setOfflineCacheActive(nextVal);
-    localStorage.setItem('sih_offline_cache', String(nextVal));
+    localStorage.setItem('sanskriti_offline_cache', String(nextVal));
   };
 
   const handleToggleNotifications = () => {
     const nextVal = !notificationsEnabled;
     setNotificationsEnabled(nextVal);
-    localStorage.setItem('sih_radar_alerts', String(nextVal));
+    localStorage.setItem('sanskriti_radar_alerts', String(nextVal));
   };
 
   // Activity stats
@@ -176,7 +176,7 @@ export default function ProfilePage() {
 
   const odopOrdersCount = (() => {
     try {
-      return JSON.parse(localStorage.getItem('sih_odop_orders') || '[]').length;
+      return JSON.parse(localStorage.getItem('sanskriti_odop_orders') || localStorage.getItem('sih_odop_orders') || '[]').length;
     } catch {
       return 1;
     }
@@ -695,7 +695,7 @@ export default function ProfilePage() {
                 </a>
 
                 <a
-                  href="mailto:support@sanskriti.gov.in"
+                  href="mailto:support@sanskritikhoj.in"
                   className="p-3 rounded-2xl bg-white border border-stone-200/80 hover:border-blue-300 hover:shadow-xs transition-all flex items-center gap-2.5 group cursor-pointer"
                 >
                   <div className="p-2 rounded-xl bg-blue-50 text-blue-700 group-hover:bg-blue-600 group-hover:text-white transition-colors flex-shrink-0">
@@ -703,10 +703,10 @@ export default function ProfilePage() {
                   </div>
                   <div className="min-w-0 truncate">
                     <div className="text-[10px] text-stone-500 uppercase font-semibold">
-                      {lang === 'hi' ? 'आधिकारिक ईमेल' : 'Official Email'}
+                      {lang === 'hi' ? 'सहायता ईमेल' : 'Support Email'}
                     </div>
                     <div className="text-xs font-bold text-stone-900 group-hover:text-blue-700 truncate font-mono">
-                      support@sanskriti.gov.in
+                      support@sanskritikhoj.in
                     </div>
                   </div>
                 </a>

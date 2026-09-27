@@ -288,7 +288,7 @@ Return a JSON object with this exact structure:
       }
     }
 
-    // High-quality Smart Cultural Discovery Engine (Guaranteed zero-failure during demos)
+    // Curated Cultural Discovery Heuristic Engine
     const encoded = encodeURIComponent(`${cleanName} ${cleanState}`);
 
     const heuristicData = {

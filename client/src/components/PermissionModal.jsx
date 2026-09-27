@@ -10,7 +10,7 @@ export default function PermissionModal() {
   const { user, continueAsGuest } = useAuth();
 
   useEffect(() => {
-    const hasSeen = localStorage.getItem('sih_heritage_permission_seen');
+    const hasSeen = localStorage.getItem('sanskriti_permission_seen') || localStorage.getItem('sih_heritage_permission_seen');
     if (!hasSeen) {
       setIsOpen(true);
     }
@@ -18,7 +18,7 @@ export default function PermissionModal() {
 
   const handleGrant = async () => {
     setRequesting(true);
-    localStorage.setItem('sih_heritage_permission_seen', 'true');
+    localStorage.setItem('sanskriti_permission_seen', 'true');
 
     // 1. Request Native & Browser Geolocation Permission
     try {
@@ -61,7 +61,7 @@ export default function PermissionModal() {
   };
 
   const handleSkip = () => {
-    localStorage.setItem('sih_heritage_permission_seen', 'true');
+    localStorage.setItem('sanskriti_permission_seen', 'true');
     if (!user) {
       continueAsGuest();
     }
@@ -83,7 +83,7 @@ export default function PermissionModal() {
             National Cultural Heritage Portal
           </span>
           <h2 className="font-serif text-2xl font-bold text-stone-900 mt-2">
-            Welcome to <span className="text-heritage-600">संस्कृति</span> Khoj
+            Welcome to <span className="text-heritage-600">Sanskriti</span>Khoj
           </h2>
           <p className="text-xs text-stone-500 mt-1.5 leading-relaxed">
             Discover living monuments, listen to folk chronicles, and support traditional artisans nearest to you.

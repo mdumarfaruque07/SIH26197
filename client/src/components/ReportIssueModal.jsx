@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
 import {
   X,
   AlertTriangle,
@@ -156,16 +157,12 @@ export default function ReportIssueModal({ isOpen, onClose, onTicketCreated }) {
       let newTicketData = null;
 
       try {
-        const response = await fetch('http://localhost:5000/api/support/report', {
-          method: 'POST',
-          body: formData,
+        const response = await api.post('/support/report', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
         });
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.ticket) {
-            newTicketData = data.ticket;
-          }
+        if (response.data && response.data.success && response.data.ticket) {
+          newTicketData = response.data.ticket;
         }
       } catch (networkErr) {
         console.warn('Network API report error, generating local ticket fallback:', networkErr);
@@ -174,13 +171,13 @@ export default function ReportIssueModal({ isOpen, onClose, onTicketCreated }) {
       // Fallback local ticket if offline or server unreachable
       if (!newTicketData) {
         newTicketData = {
-          id: `ASI-GRV-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`,
+          id: `SK-TKT-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`,
           category,
           subject: subject.trim(),
           description: description.trim(),
           priority,
           referenceId: referenceId.trim(),
-          contactEmail: contactEmail.trim() || 'tourist@sanskritigo.in',
+          contactEmail: contactEmail.trim() || 'tourist@sanskritikhoj.in',
           contactPhone: contactPhone.trim(),
           status: 'Under Review',
           statusHi: 'समीक्षाधीन',
@@ -191,9 +188,9 @@ export default function ReportIssueModal({ isOpen, onClose, onTicketCreated }) {
 
       // Persist to user's local tickets cache
       try {
-        const existing = JSON.parse(localStorage.getItem('sih_support_tickets') || '[]');
+        const existing = JSON.parse(localStorage.getItem('sanskriti_support_tickets') || localStorage.getItem('sih_support_tickets') || '[]');
         const updated = [newTicketData, ...existing];
-        localStorage.setItem('sih_support_tickets', JSON.stringify(updated));
+        localStorage.setItem('sanskriti_support_tickets', JSON.stringify(updated));
       } catch (storageErr) {
         console.error('LocalStorage ticket save error:', storageErr);
       }

@@ -38,7 +38,7 @@ export default function MenuDrawer({ isOpen, onClose, onOpenPostModal }) {
               </div>
               <div className="min-w-0">
                 <h3 className="font-serif font-bold text-base text-stone-900 leading-tight whitespace-nowrap">
-                  संस्कृति Khoj
+                  {lang === 'hi' ? 'संस्कृति खोज' : 'SanskritiKhoj'}
                 </h3>
                 <p className="text-[10px] text-stone-500 uppercase tracking-wider font-semibold whitespace-nowrap">
                   Indian Heritage Portal

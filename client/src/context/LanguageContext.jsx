@@ -119,19 +119,19 @@ export const TRANSLATIONS = {
 
 export function LanguageProvider({ children }) {
   const [lang, setLang] = useState(() => {
-    return localStorage.getItem('sih_app_lang') || 'en';
+    return localStorage.getItem('sanskriti_lang') || localStorage.getItem('sih_app_lang') || 'en';
   });
 
   const toggleLanguage = () => {
     const nextLang = lang === 'en' ? 'hi' : 'en';
     setLang(nextLang);
-    localStorage.setItem('sih_app_lang', nextLang);
+    localStorage.setItem('sanskriti_lang', nextLang);
   };
 
   const setSpecificLanguage = (newLang) => {
     if (newLang === 'en' || newLang === 'hi') {
       setLang(newLang);
-      localStorage.setItem('sih_app_lang', newLang);
+      localStorage.setItem('sanskriti_lang', newLang);
     }
   };
 

@@ -99,7 +99,7 @@ export default function BazaarPage() {
   const getWhatsAppUrl = (product) => {
     const raw = (product.whatsapp || product.phone || '919876543210').replace(/[^0-9]/g, '');
     const phoneNum = raw.startsWith('91') ? raw : `91${raw}`;
-    const text = `Namaste! I found your craft "${product.name}" on SanskritiGO Heritage App. I would like to visit your shop (${product.shopName || product.artisanName}). Are you open today?`;
+    const text = `Namaste! I found your craft "${product.name}" on SanskritiKhoj Heritage App. I would like to visit your shop (${product.shopName || product.artisanName}). Are you open today?`;
     return `https://wa.me/${phoneNum}?text=${encodeURIComponent(text)}`;
   };
 
@@ -650,7 +650,7 @@ export default function BazaarPage() {
         </div>
       )}
 
-      {/* GI Authenticity & Anti-Counterfeit Certificate Modal (Directly solving Slide 1 Challenge: Authenticity of Traditional Products) */}
+      {/* GI Authenticity & Anti-Counterfeit Certificate Modal */}
       {giModalProduct && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 space-y-4 shadow-2xl border border-stone-200 relative overflow-hidden">

@@ -2,10 +2,16 @@ import axios from 'axios';
 import { FALLBACK_PLACES, FALLBACK_PRODUCTS, FALLBACK_FOODS } from '../data/fallbackData';
 
 export const getApiBaseUrl = () => {
-  const custom = localStorage.getItem('sih_custom_api_url');
+  const custom = localStorage.getItem('sanskriti_custom_api_url') || localStorage.getItem('sih_custom_api_url');
   if (custom && custom.trim()) {
     const clean = custom.trim().replace(/\/$/, '');
     return clean.endsWith('/api') ? clean : `${clean}/api`;
+  }
+
+  // Environment variable support (Production / Vercel / Railway)
+  if (import.meta.env?.VITE_API_URL) {
+    const envUrl = import.meta.env.VITE_API_URL.trim().replace(/\/$/, '');
+    return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`;
   }
 
   // If running inside Capacitor native Android APK
@@ -16,10 +22,10 @@ export const getApiBaseUrl = () => {
     window.Capacitor.isNativePlatform();
 
   if (isCapacitor) {
-    return 'http://10.168.182.153:5000/api';
+    return 'http://10.0.2.2:5000/api';
   }
 
-  // If accessed directly on mobile browser via computer IP (e.g. http://10.168.182.153:5173)
+  // If accessed directly on mobile browser via computer IP (e.g. http://192.168.x.x:5173)
   if (
     typeof window !== 'undefined' &&
     window.location.hostname !== 'localhost' &&
@@ -41,9 +47,10 @@ export const updateApiBaseUrl = (newUrl) => {
   if (newUrl) {
     const clean = newUrl.trim().replace(/\/$/, '');
     const full = clean.endsWith('/api') ? clean : `${clean}/api`;
-    localStorage.setItem('sih_custom_api_url', clean);
+    localStorage.setItem('sanskriti_custom_api_url', clean);
     api.defaults.baseURL = full;
   } else {
+    localStorage.removeItem('sanskriti_custom_api_url');
     localStorage.removeItem('sih_custom_api_url');
     api.defaults.baseURL = getApiBaseUrl();
   }
@@ -63,7 +70,7 @@ export const checkServerHealth = async (customUrl = null) => {
 
 // Auto attach JWT token to all requests if present in localStorage
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('sih_heritage_token');
+  const token = localStorage.getItem('sanskriti_token') || localStorage.getItem('sih_heritage_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -186,7 +193,7 @@ export const authService = {
               avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
             };
         const demoToken = 'demo-jwt-token-' + Date.now();
-        localStorage.setItem('sih_heritage_token', demoToken);
+        localStorage.setItem('sanskriti_token', demoToken);
         return {
           success: true,
           message: 'Logged in successfully (Offline Fallback Mode)',
@@ -200,9 +207,9 @@ export const authService = {
   },
   register: (data) => api.post('/auth/register', data).then((res) => res.data),
   getMe: async () => {
-    const token = localStorage.getItem('sih_heritage_token');
+    const token = localStorage.getItem('sanskriti_token') || localStorage.getItem('sih_heritage_token');
     if (token && token.startsWith('demo-jwt-token-')) {
-      const saved = localStorage.getItem('sih_custom_profile');
+      const saved = localStorage.getItem('sanskriti_profile') || localStorage.getItem('sih_custom_profile');
       if (saved) {
         try {
           return { success: true, user: JSON.parse(saved) };
@@ -246,12 +253,12 @@ export const productService = {
     try {
       const res = await api.get('/products', { params });
       // Merge with locally added artisan products if any
-      const localProducts = JSON.parse(localStorage.getItem('sih_custom_products') || '[]');
+      const localProducts = JSON.parse(localStorage.getItem('sanskriti_custom_products') || localStorage.getItem('sih_custom_products') || '[]');
       let combined = [...localProducts, ...(res.data.products || [])];
       return { success: true, count: combined.length, products: combined };
     } catch (err) {
       console.warn('Backend /products failed, using fallback ODOP products:', err.message);
-      const localProducts = JSON.parse(localStorage.getItem('sih_custom_products') || '[]');
+      const localProducts = JSON.parse(localStorage.getItem('sanskriti_custom_products') || localStorage.getItem('sih_custom_products') || '[]');
       let list = [...localProducts, ...FALLBACK_PRODUCTS];
       if (params?.category && params.category !== 'all') {
         list = list.filter((p) => p.category === params.category);
@@ -271,13 +278,13 @@ export const productService = {
   getByPlace: async (placeId) => {
     try {
       const res = await api.get(`/products/place/${placeId}`);
-      const localProducts = JSON.parse(localStorage.getItem('sih_custom_products') || '[]').filter(
+      const localProducts = JSON.parse(localStorage.getItem('sanskriti_custom_products') || localStorage.getItem('sih_custom_products') || '[]').filter(
         (p) => p.placeId === Number(placeId)
       );
       const combined = [...localProducts, ...(res.data.products || [])];
       return { success: true, products: combined };
     } catch (err) {
-      const localProducts = JSON.parse(localStorage.getItem('sih_custom_products') || '[]').filter(
+      const localProducts = JSON.parse(localStorage.getItem('sanskriti_custom_products') || localStorage.getItem('sih_custom_products') || '[]').filter(
         (p) => p.placeId === Number(placeId)
       );
       const list = [...localProducts, ...FALLBACK_PRODUCTS.filter((p) => p.placeId === Number(placeId))];
@@ -289,7 +296,7 @@ export const productService = {
       const res = await api.get(`/products/${id}`);
       return res.data;
     } catch (err) {
-      const localProducts = JSON.parse(localStorage.getItem('sih_custom_products') || '[]');
+      const localProducts = JSON.parse(localStorage.getItem('sanskriti_custom_products') || localStorage.getItem('sih_custom_products') || '[]');
       const product = [...localProducts, ...FALLBACK_PRODUCTS].find((p) => p.id === Number(id));
       if (product) return { success: true, product, isOfflineFallback: true };
       throw err;
@@ -304,7 +311,7 @@ export const productService = {
       return res.data;
     } catch (err) {
       console.warn('Backend POST /products failed, persisting to local artisan store:', err.message);
-      const localProducts = JSON.parse(localStorage.getItem('sih_custom_products') || '[]');
+      const localProducts = JSON.parse(localStorage.getItem('sanskriti_custom_products') || localStorage.getItem('sih_custom_products') || '[]');
       const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
       const name = isFormData ? data.get('name') : data.name;
       const price = isFormData ? data.get('price') : data.price;
@@ -350,7 +357,7 @@ export const productService = {
         createdAt: new Date().toISOString(),
       };
       localProducts.unshift(newProduct);
-      localStorage.setItem('sih_custom_products', JSON.stringify(localProducts));
+      localStorage.setItem('sanskriti_custom_products', JSON.stringify(localProducts));
       return { success: true, product: newProduct, isOfflineFallback: true };
     }
   },
@@ -503,18 +510,18 @@ export const artisanVerificationService = {
     try {
       const res = await api.get('/artisan-verification/applications');
       if (res.data?.success && res.data?.applications) {
-        localStorage.setItem('sih_artisan_applications', JSON.stringify(res.data.applications));
+        localStorage.setItem('sanskriti_artisan_applications', JSON.stringify(res.data.applications));
         return { success: true, applications: res.data.applications };
       }
     } catch (e) {
       console.warn('Backend /artisan-verification/applications unavailable, using cache:', e.message);
     }
     try {
-      const stored = localStorage.getItem('sih_artisan_applications');
+      const stored = localStorage.getItem('sanskriti_artisan_applications') || localStorage.getItem('sih_artisan_applications');
       if (stored) {
         return { success: true, applications: JSON.parse(stored) };
       }
-      localStorage.setItem('sih_artisan_applications', JSON.stringify(INITIAL_ARTISAN_APPLICATIONS));
+      localStorage.setItem('sanskriti_artisan_applications', JSON.stringify(INITIAL_ARTISAN_APPLICATIONS));
       return { success: true, applications: INITIAL_ARTISAN_APPLICATIONS };
     } catch (e) {
       return { success: true, applications: INITIAL_ARTISAN_APPLICATIONS };
@@ -533,8 +540,7 @@ export const artisanVerificationService = {
     try {
       const res = await api.post('/artisan-verification/applications', applicationData);
       if (res.data?.success && res.data?.application) {
-        const appsRes = await artisanVerificationService.getAll();
-        localStorage.setItem('sih_current_artisan_pehchan', applicationData.pehchanId);
+        localStorage.setItem('sanskriti_current_artisan_pehchan', applicationData.pehchanId);
         return { success: true, application: res.data.application };
       }
     } catch (e) {
@@ -563,8 +569,8 @@ export const artisanVerificationService = {
       list.unshift(newApp);
     }
 
-    localStorage.setItem('sih_artisan_applications', JSON.stringify(list));
-    localStorage.setItem('sih_current_artisan_pehchan', applicationData.pehchanId);
+    localStorage.setItem('sanskriti_artisan_applications', JSON.stringify(list));
+    localStorage.setItem('sanskriti_current_artisan_pehchan', applicationData.pehchanId);
     return { success: true, application: newApp };
   },
 
@@ -594,7 +600,7 @@ export const artisanVerificationService = {
       }
       return app;
     });
-    localStorage.setItem('sih_artisan_applications', JSON.stringify(list));
+    localStorage.setItem('sanskriti_artisan_applications', JSON.stringify(list));
     return { success: true, applications: list };
   },
 
@@ -615,16 +621,16 @@ export const artisanVerificationService = {
       }
       return app;
     });
-    localStorage.setItem('sih_artisan_applications', JSON.stringify(list));
+    localStorage.setItem('sanskriti_artisan_applications', JSON.stringify(list));
     return { success: true };
   },
 
   getCurrentArtisanPehchan: () => {
-    return localStorage.getItem('sih_current_artisan_pehchan') || 'UP-AGR-44910';
+    return localStorage.getItem('sanskriti_current_artisan_pehchan') || localStorage.getItem('sih_current_artisan_pehchan') || 'UP-AGR-44910';
   },
 
   setCurrentArtisanPehchan: (pehchanId) => {
-    localStorage.setItem('sih_current_artisan_pehchan', pehchanId);
+    localStorage.setItem('sanskriti_current_artisan_pehchan', pehchanId);
   },
 };
 
