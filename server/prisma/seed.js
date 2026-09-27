@@ -2,14 +2,18 @@ import prisma from '../src/prisma.js';
 import bcrypt from 'bcryptjs';
 
 async function main() {
-  console.log('🌱 Starting database seed...');
+  console.log('🌱 Starting comprehensive database seed for SanskritiKhoj...');
 
-  // 1. Clean existing records (optional, in correct order of relations)
+  // 1. Clean existing records in relation-safe order
   await prisma.bookmark.deleteMany();
   await prisma.post.deleteMany();
   await prisma.mediaLink.deleteMany();
+  await prisma.product.deleteMany();
+  await prisma.food.deleteMany();
+  await prisma.artisanApplication.deleteMany();
   await prisma.place.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.supportTicket.deleteMany();
 
   // 2. Create Users (1 Admin, 2 Regular Users)
   const passwordHash = await bcrypt.hash('password123', 10);
@@ -286,11 +290,14 @@ Also in the complex are the Quwwat-ul-Islam Mosque, the Alai Darwaza gateway bui
     },
   ];
 
+  const createdPlacesMap = {};
+
   for (const place of placesData) {
     const { mediaLinks, posts, ...placeFields } = place;
     const createdPlace = await prisma.place.create({
       data: placeFields,
     });
+    createdPlacesMap[createdPlace.slug] = createdPlace;
 
     if (mediaLinks && mediaLinks.length > 0) {
       await prisma.mediaLink.createMany({
@@ -310,8 +317,373 @@ Also in the complex are the Quwwat-ul-Islam Mosque, the Alai Darwaza gateway bui
     }
   }
 
-  console.log(`✅ Seeded ${placesData.length} iconic heritage places with media and reviews!`);
-  console.log('🎉 Database seeding completed successfully!');
+  console.log(`✅ Seeded ${placesData.length} iconic heritage places with media and posts!`);
+
+  // 4. Seed ODOP Handicrafts & Souvenir Products
+  const tajPlace = createdPlacesMap['taj-mahal'];
+  const hampiPlace = createdPlacesMap['hampi-monuments'];
+  const konarkPlace = createdPlacesMap['konark-sun-temple'];
+  const meenakshiPlace = createdPlacesMap['meenakshi-amman-temple'];
+  const varanasiPlace = createdPlacesMap['varanasi-ghats'];
+  const amerPlace = createdPlacesMap['amer-fort-jaipur'];
+  const qutubPlace = createdPlacesMap['qutub-minar'];
+
+  const productsData = [
+    {
+      placeId: tajPlace.id,
+      name: 'Makrana Marble Inlay Floral Coasters (Parchin Kari)',
+      description: 'Handcrafted by 6th generation marble artisans using authentic Makrana marble with semi-precious lapis and malachite stone inlay.',
+      price: 1450,
+      imageUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=800&q=80',
+      artisanName: 'Ustad Rashid & Sons',
+      odopTag: 'ODOP: Agra Marble Inlay',
+      category: 'handicraft',
+      rating: 4.9,
+      shopName: 'Rashid Makrana Marble & Pietra Dura Workshop',
+      shopAddress: 'Shop 14, Near Taj West Gate, Tajganj, Agra, UP - 282001',
+      shopLandmark: 'Opposite Royal Gate Heritage Entry (350m from Taj Mahal)',
+      shopTiming: '09:00 AM - 08:30 PM (Daily)',
+      phone: '+91 98370 12345',
+      whatsapp: '919837012345',
+    },
+    {
+      placeId: varanasiPlace.id,
+      name: 'Pure Katan Handloom Banarasi Silk Brocade Scarf',
+      description: 'Handwoven on traditional pit looms in Varanasi with real zari floral bootis, representing centuries of sacred weaving.',
+      price: 2199,
+      imageUrl: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=800&q=80',
+      artisanName: 'Kashi Bunkar Weavers Society',
+      odopTag: 'ODOP: Banarasi Brocade & Silk',
+      category: 'attire',
+      rating: 4.9,
+      shopName: 'Kashi Silk Weavers Heritage Emporium',
+      shopAddress: 'K-22/41, Madanpura Silk Lane, Near Godowlia Chowk, Varanasi, UP - 221001',
+      shopLandmark: 'Adjacent to Silk Heritage Walk (850m from Dashashwamedh Ghat)',
+      shopTiming: '10:00 AM - 09:00 PM',
+      phone: '+91 94152 67890',
+      whatsapp: '919415267890',
+    },
+    {
+      placeId: varanasiPlace.id,
+      name: 'Brass Ganga Aarti Panchmukhi Diya (Sacred 5-Tier Lamp)',
+      description: 'Solid brass ceremonial lamp identical to those used during the evening Dashashwamedh Ghat Aarti ceremonies.',
+      price: 849,
+      imageUrl: 'https://images.unsplash.com/photo-1605649487212-47bdab064df7?auto=format&fit=crop&w=800&q=80',
+      artisanName: 'Kashi Thathera Metal Guild',
+      odopTag: 'ODOP: Varanasi Metal Craft',
+      category: 'souvenir',
+      rating: 4.8,
+      shopName: 'Kashi Vishwanath Brass & Bell Metal Store',
+      shopAddress: 'D-32/14, Dashashwamedh Ghat Road, Godowlia, Varanasi, Uttar Pradesh - 221001',
+      shopLandmark: '70m before Dashashwamedh Ghat Main Steps',
+      shopTiming: '08:00 AM - 10:00 PM (Open Every Day)',
+      phone: '+91 98391 55672',
+      whatsapp: '919839155672',
+    },
+    {
+      placeId: amerPlace.id,
+      name: 'Hand-Painted Blue Pottery Floral Vase',
+      description: 'Traditional Jaipur blue pottery made using Egyptian paste technique, quartz powder, and natural cobalt oxide dyes.',
+      price: 1250,
+      imageUrl: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&w=800&q=80',
+      artisanName: 'Master Kripal Blue Art Studio',
+      odopTag: 'ODOP: Jaipur Blue Pottery',
+      category: 'pottery',
+      rating: 4.8,
+      shopName: 'Master Kripal Blue Pottery Art Emporium',
+      shopAddress: 'B-18, Shiv Marg, Near Amer Road Heritage Walk, Jaipur, Rajasthan - 302002',
+      shopLandmark: 'On Amer-Jaipur Heritage Boulevard, near Jal Mahal view point',
+      shopTiming: '10:00 AM - 08:00 PM (Daily)',
+      phone: '+91 98290 54321',
+      whatsapp: '919829054321',
+    },
+    {
+      placeId: hampiPlace.id,
+      name: 'Channapatna Lacquered Stone Chariot Miniature',
+      description: 'Made from ivory wood and colored with non-toxic natural turmeric, indigo and kumkum dyes by GI-certified artisans.',
+      price: 650,
+      imageUrl: 'https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?auto=format&fit=crop&w=800&q=80',
+      artisanName: 'Venkatesh Toy Crafts (Channapatna)',
+      odopTag: 'GI Tagged: Channapatna Toys & Crafts',
+      category: 'souvenir',
+      rating: 4.8,
+      shopName: 'Vijayanagara Heritage Crafts & Channapatna Studio',
+      shopAddress: 'Hampi Bazaar Street, Near Virupaksha Temple Complex, Hampi, Karnataka - 583239',
+      shopLandmark: '120m from Virupaksha Temple Main Entrance',
+      shopTiming: '09:00 AM - 08:00 PM (Daily)',
+      phone: '+91 97410 33219',
+      whatsapp: '919741033219',
+    },
+    {
+      placeId: meenakshiPlace.id,
+      name: 'Handcrafted Dravidian Brass Nandi Statue',
+      description: 'Lost-wax cast brass sculpture with intricate temple jewel engravings crafted in Madurai.',
+      price: 1199,
+      imageUrl: 'https://images.unsplash.com/photo-1599707367072-cd6ada2bc375?auto=format&fit=crop&w=800&q=80',
+      artisanName: 'Madurai Sthapathi Metalworks',
+      odopTag: 'ODOP: Madurai Brassware',
+      category: 'handicraft',
+      rating: 4.9,
+      shopName: 'Madurai Sthapathi Bronze & Brass Emporium',
+      shopAddress: 'No. 24, South Tower Street, Near Temple Amman Sannathi, Madurai, Tamil Nadu - 625001',
+      shopLandmark: '80m from Meenakshi Amman Temple South Gopuram',
+      shopTiming: '08:30 AM - 09:00 PM (Open 7 Days)',
+      phone: '+91 94431 87654',
+      whatsapp: '919443187654',
+    },
+    {
+      placeId: qutubPlace.id,
+      name: 'Terracotta Ancient Brickwork Garden Windchime',
+      description: 'Earthy hand-turned clay bells inspired by the fluted columns and Arabic inscriptions of the Qutub Minar.',
+      price: 450,
+      imageUrl: 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?auto=format&fit=crop&w=800&q=80',
+      artisanName: 'Kumhar Gram Potter Collective (Delhi)',
+      odopTag: 'Delhi Heritage Craft Circle',
+      category: 'pottery',
+      rating: 4.7,
+      shopName: 'Kumhar Gram Heritage Pottery Studio',
+      shopAddress: 'Gali 4, Kumhar Gram Village, Mehrauli Heritage Cluster, New Delhi - 110059',
+      shopLandmark: '15 mins from Qutub Minar Complex Gate 2',
+      shopTiming: '10:00 AM - 07:30 PM (Open 7 Days)',
+      phone: '+91 98112 45890',
+      whatsapp: '919811245890',
+    },
+  ];
+
+  await prisma.product.createMany({
+    data: productsData,
+  });
+  console.log(`✅ Seeded ${productsData.length} ODOP handicraft products in Artisan Bazaar!`);
+
+  // 5. Seed Culinary Heritage (Foods)
+  const foodsData = [
+    {
+      placeId: tajPlace.id,
+      monumentName: 'Taj Mahal',
+      name: 'Agra Petha (Kesar & Angoori)',
+      nameHi: 'आगरा का पेठा (केसर व अंगूरी)',
+      categoryType: 'Iconic Royal Sweet',
+      categoryTypeHi: 'शाही मिष्ठान',
+      diet: 'veg',
+      isDeliverable: false,
+      famousSince: 'Mughal Era (1632 AD)',
+      shortLore: 'Created over 370 years ago in the royal kitchens of Emperor Shah Jahan to provide quick hydration and vitality to the 20,000 master stone-carvers building the Taj Mahal.',
+      shortLoreHi: 'ताजमहल का निर्माण करने वाले 20,000 शिल्पकारों को ऊर्जा और स्फूर्ति प्रदान करने के लिए मुगल बादशाह शाहजहाँ की शाही रसोई में इसका आविष्कार हुआ था।',
+      famousSpots: 'Panchhi Petha (Sadar Bazaar & Hari Parbat), Noori Gate Petha Bazaar, Agra',
+      famousSpotsHi: 'पंछी पेठा (सदर बाज़ार व हरी पर्वत), नूरी गेट पेठा बाज़ार, आगरा',
+      priceRange: '₹60 - ₹180 / 500g',
+      imageUrl: 'https://images.unsplash.com/photo-1599785209707-a456fc1337bb?auto=format&fit=crop&w=800&q=80',
+      curatedBy: 'Ministry of Tourism & Cultural Heritage Cell',
+    },
+    {
+      placeId: tajPlace.id,
+      monumentName: 'Taj Mahal',
+      name: 'Agra Bedai & Crispy Jalebi with Dalmoth',
+      nameHi: 'आगरा की बेड़ई-जलेबी व हींग दालमोठ',
+      categoryType: 'Traditional Breakfast & Savory',
+      categoryTypeHi: 'पारंपरिक नाश्ता व नमकीन',
+      diet: 'veg',
+      isDeliverable: false,
+      famousSince: 'Colonial & Princely Agra (1880s)',
+      shortLore: 'Crisp urad dal stuffed poori served with spicy potato dubki jalebi and sev dalmoth, a morning ritual for Agra locals for over a century.',
+      shortLoreHi: 'उड़द दाल की खस्ता कचौरी, तीखी डुबकी आलू की सब्ज़ी और शुद्ध देसी घी की जलेबी—यह पिछले 150 वर्षों से आगरा का सबसे पसंदीदा नाश्ता है।',
+      famousSpots: 'Deviram Sweets (Pratap Pura), Chimmanlal Poori Wale, Belanganj, Agra',
+      famousSpotsHi: 'देवीराम स्वीट्स (प्रताप पुरा), चिम्मनलाल पूरी वाले, बेलनगंज, आगरा',
+      priceRange: '₹40 - ₹80 per plate',
+      imageUrl: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=800&q=80',
+      curatedBy: 'Ministry of Tourism & Cultural Heritage Cell',
+    },
+    {
+      placeId: varanasiPlace.id,
+      monumentName: 'Kashi Vishwanath & Ganga Ghats',
+      name: 'Banarasi Meetha Paan',
+      nameHi: 'शाही बनारसी मीठा पान',
+      categoryType: 'Iconic Aromatic Digestive',
+      categoryTypeHi: 'शाही सुगंधित मुखवास',
+      diet: 'veg',
+      isDeliverable: false,
+      famousSince: 'Ancient Kashi (Mentioned in Skanda Purana)',
+      shortLore: 'Prepared with fresh Maghai betel leaf, fragrant gulkand, churned fennel, menthol, and edible gold leaf—a hallmark of Kashi hospitality and cultural lore.',
+      shortLoreHi: 'मघई के नर्म पत्तों, सुगन्धित गुलकंद, केसर और बनारसी मसालों से तैयार यह पान काशी की आतिथ्य सत्कार परंपरा का जीवंत प्रतीक है।',
+      famousSpots: 'Keshav Tambool Bhandar (Lanka Chowk), Pehalwan Paan (Godowlia Crossing), Varanasi',
+      famousSpotsHi: 'केशव तांबूल भंडार (लंका चौराहा), पहलवान पान भंडार (गोदौलिया), वाराणसी',
+      priceRange: '₹30 - ₹70 per paan',
+      imageUrl: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=800&q=80',
+      curatedBy: 'Ministry of Tourism & Cultural Heritage Cell',
+    },
+    {
+      placeId: varanasiPlace.id,
+      monumentName: 'Kashi Vishwanath & Ganga Ghats',
+      name: 'Banarasi Malaiyyo (Winter Dew Nectar)',
+      nameHi: 'बनारसी मलइयो (शीतकालीन ओस मिष्ठान)',
+      categoryType: 'Celestial Heritage Dessert',
+      categoryTypeHi: 'पारंपरिक मौसमी मिष्ठान',
+      diet: 'veg',
+      isDeliverable: false,
+      famousSince: '18th Century Kashi Guilds',
+      shortLore: 'A delicate winter froth created by boiling milk and leaving it under the open winter night dew, then vigorously churned and garnished with saffron and pistachios.',
+      shortLoreHi: 'सर्दियों की रात में खुली ओस के नीचे रखे गाढ़े दूध को मथकर बनाया जाने वाला बादलों जैसा हल्का और केसरिया मिष्ठान।',
+      famousSpots: 'Thatheri Bazaar, Chowk, Chaukhamba, Varanasi',
+      famousSpotsHi: 'ठठेरी बाज़ार, चौक व चौखंभा की संकरी गलियां, वाराणसी',
+      priceRange: '₹50 - ₹100 per kulhad',
+      imageUrl: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=800&q=80',
+      curatedBy: 'Ministry of Tourism & Cultural Heritage Cell',
+    },
+    {
+      placeId: qutubPlace.id,
+      monumentName: 'Qutub Minar & Mehrauli',
+      name: 'Old Delhi Nihari & Tandoori Sheermal',
+      nameHi: 'पुरानी दिल्ली की निहारी व शीरमाल',
+      categoryType: 'Mughal Era Slow-Cooked Stew',
+      categoryTypeHi: 'मुग़लकालीन शाही पकवान',
+      diet: 'non-veg',
+      isDeliverable: false,
+      famousSince: 'Late Mughal Era (17th Century)',
+      shortLore: 'Slow-cooked overnight in sealed copper cauldrons with 40 rare spices, traditionally relished at dawn near Delhi historic minarets.',
+      shortLoreHi: 'रातभर तांबे की देग में 40 दुर्लभ मसालों के साथ धीमी आंच पर पकाई जाने वाली निहारी, जिसे मीठी केसरिया शीरमाल के साथ परोसा जाता है।',
+      famousSpots: 'Karim Hotel (Gali Kababian, Jama Masjid), Al Jawahar, Mehrauli Dargah Bazaar',
+      famousSpotsHi: 'करीम होटल (जामा मस्जिद), अल जवाहर, महरौली दरगाह बाज़ार',
+      priceRange: '₹150 - ₹350 per bowl',
+      imageUrl: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80',
+      curatedBy: 'Ministry of Tourism & Cultural Heritage Cell',
+    },
+    {
+      placeId: konarkPlace.id,
+      monumentName: 'Konark Sun Temple & Puri',
+      name: 'Odisha Chhena Poda & Khaja',
+      nameHi: 'ओडिशा का प्रसिद्ध छेना पोड़ व खाजा',
+      categoryType: 'Ancient Temple Confection',
+      categoryTypeHi: 'प्राचीन मंदिर महाप्रसाद',
+      diet: 'veg',
+      isDeliverable: false,
+      famousSince: '12th Century Ganga Dynasty',
+      shortLore: 'Slow-baked caramelized cottage cheese wrapped in sal leaves, known as the cheesecake of the gods, served alongside crispy golden Jagannath Khaja.',
+      shortLoreHi: 'साल के पत्तों में लपेटकर घंटों तक धीमी आंच पर बेक किया हुआ कैरेमेलाइज़्ड छेना पोड़ और पुरी का कुरकुरा खाजा।',
+      famousSpots: 'Konark Temple Gate Stalls, Nayagarh Sweet Guild, Puri Bada Danda',
+      famousSpotsHi: 'कोणार्क सूर्य मंदिर गेट, नयागढ़ स्वीट गिल्ड, पुरी बड़ा दांड',
+      priceRange: '₹80 - ₹200 / box',
+      imageUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=800&q=80',
+      curatedBy: 'Ministry of Tourism & Cultural Heritage Cell',
+    },
+    {
+      placeId: amerPlace.id,
+      monumentName: 'Amer Fort & Jaipur',
+      name: 'Jaipuri Pyaaz Kachori & Saffron Ghewar',
+      nameHi: 'जयपुर की प्याज़ कचौरी व केसरिया घेवर',
+      categoryType: 'Royal Rajasthani Savory & Sweet',
+      categoryTypeHi: 'शाही राजस्थानी मिष्ठान व नमकीन',
+      diet: 'veg',
+      isDeliverable: false,
+      famousSince: '18th Century Kachwaha Kingdom',
+      shortLore: 'Flaky crisp kachoris infused with spicy caramelized onions, paired with honeycombed royal Malai Ghewar prepared by royal halwais of the Pink City.',
+      shortLoreHi: 'मसालेदार भुनी प्याज़ से भरी खस्ता कचौरी और केसर रबड़ी से सजा पारंपरिक राजस्थानी जालीदार घेवर।',
+      famousSpots: 'Rawat Mishthan Bhandar (Station Road), LMB Sweets (Johari Bazaar), Amer Town Gate',
+      famousSpotsHi: 'रावत मिष्ठान भंडार, एलएमबी स्वीट्स (जौहरी बाज़ार), आमेर टाउन गेट',
+      priceRange: '₹50 - ₹160 per piece',
+      imageUrl: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=800&q=80',
+      curatedBy: 'Ministry of Tourism & Cultural Heritage Cell',
+    },
+  ];
+
+  await prisma.food.createMany({
+    data: foodsData,
+  });
+  console.log(`✅ Seeded ${foodsData.length} culinary heritage lore items in MySQL!`);
+
+  // 6. Seed Artisan Applications
+  const artisanAppsData = [
+    {
+      id: 'APP-AGR-44910',
+      artisanName: 'Ustad Rashid & Sons',
+      shopName: 'Rashid Makrana Marble & Pietra Dura Workshop',
+      shopAddress: 'Shop 14, Near Taj West Gate, Tajganj, Agra, UP - 282001',
+      shopLandmark: 'Opposite Royal Gate Heritage Entry (350m from Taj Mahal)',
+      shopTiming: '09:00 AM - 08:30 PM (Daily)',
+      placeId: tajPlace.id,
+      monumentName: 'Taj Mahal (Agra)',
+      monumentDistance: '350m',
+      phone: '+91 98370 12345',
+      whatsapp: '919837012345',
+      pehchanId: 'UP-AGR-44910',
+      cooperativeName: 'Agra Marble Artisans Guild',
+      clusterLocation: 'Tajganj Heritage Cluster, Agra',
+      craftType: 'Makrana Marble Inlay / Pietra Dura (पच्चीकारी)',
+      status: 'APPROVED',
+      activePlan: 'gold',
+      submittedAt: new Date('2026-01-10T10:30:00.000Z'),
+      approvedAt: new Date('2026-01-11T14:15:00.000Z'),
+      verifiedBy: 'ASI Heritage Directorate (Dr. V. Sharma)',
+      adminNotes: 'Physical workshop verified by Regional Tourism Officer. 100% authentic Makrana marble with semi-precious stone inlay.',
+    },
+    {
+      id: 'APP-VAR-10842',
+      artisanName: 'Kashi Bunkar Weavers Society',
+      shopName: 'Kashi Silk Weavers Heritage Emporium',
+      shopAddress: 'K-22/41, Madanpura Silk Lane, Near Godowlia Chowk, Varanasi, UP - 221001',
+      shopLandmark: 'Adjacent to Silk Heritage Walk (850m from Dashashwamedh Ghat)',
+      shopTiming: '10:00 AM - 09:00 PM',
+      placeId: varanasiPlace.id,
+      monumentName: 'Kashi Vishwanath & Ganga Ghats',
+      monumentDistance: '850m',
+      phone: '+91 94152 67890',
+      whatsapp: '919415267890',
+      pehchanId: 'UP-VAR-10842',
+      cooperativeName: 'Varanasi Handloom Silk Weavers Samiti',
+      clusterLocation: 'Madanpura & Lohta Weaving Cluster, Varanasi',
+      craftType: 'Handloom Pure Silk Banarasi Saree & Brocades (बनारसी ज़री)',
+      status: 'PENDING',
+      activePlan: null,
+      submittedAt: new Date('2026-02-01T11:00:00.000Z'),
+      approvedAt: null,
+      verifiedBy: 'Pending District Handicrafts Review',
+      adminNotes: 'Awaiting physically signed verification deed from Varanasi District Industries Centre (DIC).',
+    },
+    {
+      id: 'APP-JPR-20419',
+      artisanName: 'Master Kripal Blue Art Studio',
+      shopName: 'Master Kripal Blue Pottery Art Emporium',
+      shopAddress: 'B-18, Shiv Marg, Near Amer Road Heritage Walk, Jaipur, Rajasthan - 302002',
+      shopLandmark: 'On Amer-Jaipur Heritage Boulevard, near Jal Mahal view point',
+      shopTiming: '10:00 AM - 08:00 PM (Daily)',
+      placeId: amerPlace.id,
+      monumentName: 'Amer Fort & Jaipur Heritage',
+      monumentDistance: '1.2km',
+      phone: '+91 98290 54321',
+      whatsapp: '919829054321',
+      pehchanId: 'RJ-JPR-20419',
+      cooperativeName: 'Jaipur Blue Pottery Heritage Trust',
+      clusterLocation: 'Kot Jewar & Amer Craft Hub, Jaipur',
+      craftType: 'Traditional Jaipur Blue Pottery (क्वार्ट्ज़ व मुल्तानी मिट्टी हस्तकला)',
+      status: 'PENDING',
+      activePlan: null,
+      submittedAt: new Date('2026-02-05T14:00:00.000Z'),
+      approvedAt: null,
+      verifiedBy: 'Pending District Handicrafts Review',
+      adminNotes: 'Workshop photos uploaded. Pending field inspection by Rajasthan Handicrafts Development Officer.',
+    },
+  ];
+
+  await prisma.artisanApplication.createMany({
+    data: artisanAppsData,
+  });
+  console.log(`✅ Seeded ${artisanAppsData.length} artisan workshop verification applications in MySQL!`);
+
+  // 7. Seed Sample Support Ticket
+  await prisma.supportTicket.create({
+    data: {
+      ticketNumber: 'SK-TKT-948102-318',
+      category: 'Monument Guide Audio',
+      subject: 'Audio narration buffering inquiry for Amer Fort',
+      description: 'Audio narration worked great at Taj Mahal, testing offline caching for Amer Fort.',
+      contactEmail: 'rahul@example.com',
+      contactPhone: '+91 98765 43210',
+      priority: 'normal',
+      status: 'OPEN',
+    },
+  });
+  console.log('✅ Seeded sample support ticket in MySQL!');
+
+  console.log('🎉 Comprehensive database seeding finished successfully!');
 }
 
 main()

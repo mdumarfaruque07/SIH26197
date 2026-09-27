@@ -1,14 +1,7 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import prisma from '../prisma.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const foodFilePath = path.join(__dirname, '../../uploads/culinary_heritage.json');
-
-const INITIAL_FOOD_DATA = [
+export const INITIAL_FOOD_DATA = [
   {
-    id: 1,
     placeId: 1, // Taj Mahal
     monumentName: 'Taj Mahal',
     name: 'Agra Petha (Kesar & Angoori)',
@@ -25,10 +18,8 @@ const INITIAL_FOOD_DATA = [
     priceRange: '₹60 - ₹180 / 500g',
     imageUrl: 'https://images.unsplash.com/photo-1599785209707-a456fc1337bb?auto=format&fit=crop&w=800&q=80',
     curatedBy: 'Ministry of Tourism & Cultural Heritage Cell',
-    createdAt: '2026-01-10T10:00:00.000Z',
   },
   {
-    id: 2,
     placeId: 1, // Taj Mahal
     monumentName: 'Taj Mahal',
     name: 'Agra Bedai & Crispy Jalebi with Dalmoth',
@@ -45,10 +36,8 @@ const INITIAL_FOOD_DATA = [
     priceRange: '₹40 - ₹80 per plate',
     imageUrl: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=800&q=80',
     curatedBy: 'Ministry of Tourism & Cultural Heritage Cell',
-    createdAt: '2026-01-12T10:00:00.000Z',
   },
   {
-    id: 3,
     placeId: 5, // Varanasi / Ghats
     monumentName: 'Kashi Vishwanath & Ganga Ghats',
     name: 'Banarasi Meetha Paan',
@@ -65,10 +54,8 @@ const INITIAL_FOOD_DATA = [
     priceRange: '₹30 - ₹70 per paan',
     imageUrl: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=800&q=80',
     curatedBy: 'Ministry of Tourism & Cultural Heritage Cell',
-    createdAt: '2026-01-15T10:00:00.000Z',
   },
   {
-    id: 4,
     placeId: 5, // Varanasi
     monumentName: 'Kashi Vishwanath & Ganga Ghats',
     name: 'Banarasi Malaiyyo (Winter Dew Nectar)',
@@ -85,11 +72,9 @@ const INITIAL_FOOD_DATA = [
     priceRange: '₹50 - ₹100 per kulhad',
     imageUrl: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=800&q=80',
     curatedBy: 'Ministry of Tourism & Cultural Heritage Cell',
-    createdAt: '2026-01-18T10:00:00.000Z',
   },
   {
-    id: 5,
-    placeId: 2, // Qutub Minar / Delhi
+    placeId: 2, // Qutub Minar
     monumentName: 'Qutub Minar & Mehrauli',
     name: 'Old Delhi Nihari & Tandoori Sheermal',
     nameHi: 'पुरानी दिल्ली की निहारी व शीरमाल',
@@ -105,10 +90,8 @@ const INITIAL_FOOD_DATA = [
     priceRange: '₹150 - ₹350 per bowl',
     imageUrl: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80',
     curatedBy: 'Ministry of Tourism & Cultural Heritage Cell',
-    createdAt: '2026-01-20T10:00:00.000Z',
   },
   {
-    id: 6,
     placeId: 3, // Konark Sun Temple
     monumentName: 'Konark Sun Temple & Puri',
     name: 'Odisha Chhena Poda & Khaja',
@@ -125,13 +108,9 @@ const INITIAL_FOOD_DATA = [
     priceRange: '₹80 - ₹200 / box',
     imageUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=800&q=80',
     curatedBy: 'Ministry of Tourism & Cultural Heritage Cell',
-    createdAt: '2026-01-22T10:00:00.000Z',
   },
   {
-    id: 7,
-    placeId: 4, // Amer Fort / Jaipur
-    alternatePlaceIds: [4, 13],
-    monumentSlug: 'amer-fort-jaipur',
+    placeId: 4, // Amer Fort
     monumentName: 'Amer Fort & Jaipur',
     name: 'Jaipuri Pyaaz Kachori & Saffron Ghewar',
     nameHi: 'जयपुर की प्याज़ कचौरी व केसरिया घेवर',
@@ -147,158 +126,74 @@ const INITIAL_FOOD_DATA = [
     priceRange: '₹50 - ₹160 per piece',
     imageUrl: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=800&q=80',
     curatedBy: 'Ministry of Tourism & Cultural Heritage Cell',
-    createdAt: '2026-01-25T10:00:00.000Z',
   },
-  {
-    id: 8,
-    placeId: 6, // Madurai
-    alternatePlaceIds: [6, 11],
-    monumentSlug: 'meenakshi-amman-temple',
-    monumentName: 'Meenakshi Amman Temple',
-    name: 'Royal Madurai Jigarthanda & Bun Parotta',
-    nameHi: 'मदुरै प्रसिद्ध शाही जिगरठंडा व बन परोटा',
-    categoryType: 'Royal Cooling Elixir & Temple Delicacy',
-    categoryTypeHi: 'शाही पेय व मदुरै व्यंजन',
-    diet: 'veg',
-    isDeliverable: false,
-    famousSince: 'Nayaka Dynasty Era',
-    shortLore: 'A soothing dessert drink prepared with almond gum, reduced caramelized milk and sarsaparilla root syrup, followed by multi-layered buttery Bun Parotta.',
-    shortLoreHi: 'बादाम गोंद और नन्नारी की जड़ों से धीमी आंच पर तैयार मदुरै का प्रसिद्ध शाही पेय और खस्ता बन परोटा।',
-    famousSpots: 'Famous Jigarthanda (East Marret Street), Murugan Idli Shop, West Tower Bazaar, Madurai',
-    famousSpotsHi: 'फेमस जिगरठंडा (ईस्ट मैरेट स्ट्रीट), मुरुगन इडली शॉप, वेस्ट टावर बाज़ार',
-    priceRange: '₹60 - ₹120 per glass',
-    imageUrl: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=800&q=80',
-    curatedBy: 'Ministry of Tourism & Cultural Heritage Cell',
-    createdAt: '2026-01-28T10:00:00.000Z',
-  },
-  {
-    id: 9,
-    placeId: 7, // Hampi
-    alternatePlaceIds: [7, 9],
-    monumentSlug: 'hampi-monuments',
-    monumentName: 'Group of Monuments at Hampi',
-    name: 'Karnataka Bisi Bele Bath & Filter Kaapi',
-    nameHi: 'कर्नाटक पारंपरिक बिसी बेले बाथ व फ़िल्टर कॉफ़ी',
-    categoryType: 'Vijayanagara Empire Thali Food',
-    categoryTypeHi: 'पारंपरिक दक्षिण भारतीय व्यंजन',
-    diet: 'veg',
-    isDeliverable: false,
-    famousSince: 'Vijayanagara Era (14th Century)',
-    shortLore: 'A rich, spicy rice-lentil blend simmered with local tamarind, nutmeg, ghee and country vegetables, concluded with frothy chicory-infused brass tumbler filter coffee.',
-    shortLoreHi: 'इमली, दाल, देशी घी और मसालों के साथ धीमी आंच पर पकाया जाने वाला स्वादिष्ट चावल और पीतल के लोटे में परोसी जाने वाली झागदार फ़िल्टर कॉफ़ी।',
-    famousSpots: 'Mango Tree Restaurant (Hampi Bazaar), Kamath Hotel, Kamalapura Heritage Road',
-    famousSpotsHi: 'मैंगो ट्री रेस्टोरेंट (हम्पी बाज़ार), कामत होटल, कमलापुरा हेरिटेज रोड',
-    priceRange: '₹70 - ₹150 per plate',
-    imageUrl: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=800&q=80',
-    curatedBy: 'Ministry of Tourism & Cultural Heritage Cell',
-    createdAt: '2026-02-01T10:00:00.000Z',
-  }
 ];
 
-const ensureStorage = () => {
-  const uploadsDir = path.join(__dirname, '../../uploads');
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-  }
-  if (!fs.existsSync(foodFilePath)) {
-    fs.writeFileSync(foodFilePath, JSON.stringify(INITIAL_FOOD_DATA, null, 2));
-  }
-};
-
-const readFoodItems = () => {
+// GET all foods with filters
+export const getAllFoods = async (req, res) => {
   try {
-    ensureStorage();
-    const data = fs.readFileSync(foodFilePath, 'utf-8');
-    const parsed = JSON.parse(data || '[]');
-    return parsed.length > 0 ? parsed : INITIAL_FOOD_DATA;
-  } catch (err) {
-    console.error('Error reading culinary items:', err);
-    return INITIAL_FOOD_DATA;
-  }
-};
+    const { placeId, diet, search } = req.query;
 
-const writeFoodItems = (items) => {
-  try {
-    ensureStorage();
-    fs.writeFileSync(foodFilePath, JSON.stringify(items, null, 2));
-  } catch (err) {
-    console.error('Error writing culinary items:', err);
-  }
-};
-
-// GET all food items (with optional filters)
-export const getAllFood = async (req, res) => {
-  try {
-    const { placeId, search, diet } = req.query;
-    let items = readFoodItems();
-
+    const where = {};
     if (placeId) {
-      items = items.filter((f) => String(f.placeId) === String(placeId));
+      where.placeId = parseInt(placeId);
     }
     if (diet && diet !== 'all') {
-      items = items.filter((f) => f.diet === diet);
+      where.diet = diet;
     }
     if (search) {
-      const q = search.toLowerCase();
-      items = items.filter(
-        (f) =>
-          f.name.toLowerCase().includes(q) ||
-          (f.nameHi && f.nameHi.includes(q)) ||
-          f.monumentName.toLowerCase().includes(q) ||
-          f.shortLore.toLowerCase().includes(q) ||
-          f.famousSpots.toLowerCase().includes(q)
-      );
+      where.OR = [
+        { name: { contains: search } },
+        { nameHi: { contains: search } },
+        { monumentName: { contains: search } },
+        { famousSpots: { contains: search } },
+      ];
     }
+
+    const foods = await prisma.food.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        place: {
+          select: { id: true, name: true, slug: true, state: true },
+        },
+      },
+    });
 
     return res.json({
       success: true,
-      count: items.length,
-      foods: items,
+      count: foods.length,
+      foods,
       notice: 'Non-deliverable regional culinary heritage. For on-site tourism discovery only.',
     });
   } catch (error) {
-    console.error('getAllFood error:', error);
-    return res.status(500).json({ success: false, message: 'Failed to fetch food heritage items.' });
+    console.error('getAllFoods error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch culinary heritage.' });
   }
 };
 
-// GET food by place ID
+// GET food by placeId
 export const getFoodByPlace = async (req, res) => {
   try {
-    const rawPlaceId = req.params.placeId;
-    const { slug, name } = req.query;
-    const pid = parseInt(rawPlaceId, 10);
-    const items = readFoodItems();
-
-    let matches = items.filter((f) => {
-      if (f.placeId === pid || (f.alternatePlaceIds && f.alternatePlaceIds.includes(pid))) {
-        return true;
-      }
-      if (slug && f.monumentSlug && f.monumentSlug.includes(slug)) {
-        return true;
-      }
-      if (name && f.monumentName && f.monumentName.toLowerCase().includes(name.toLowerCase())) {
-        return true;
-      }
-      return false;
-    });
-
-    if (matches.length === 0) {
-      if (slug?.includes('taj') || name?.toLowerCase().includes('taj') || pid === 1 || pid === 8) {
-        matches = items.filter((f) => f.monumentName?.toLowerCase().includes('taj'));
-      } else if (slug?.includes('varanasi') || name?.toLowerCase().includes('varanasi') || slug?.includes('kashi') || pid === 5 || pid === 12) {
-        matches = items.filter((f) => f.monumentName?.toLowerCase().includes('kashi') || f.monumentName?.toLowerCase().includes('varanasi'));
-      } else if (slug?.includes('qutub') || name?.toLowerCase().includes('qutub') || pid === 2 || pid === 14) {
-        matches = items.filter((f) => f.monumentName?.toLowerCase().includes('qutub') || f.monumentName?.toLowerCase().includes('delhi'));
-      } else if (slug?.includes('konark') || name?.toLowerCase().includes('konark') || pid === 3 || pid === 10) {
-        matches = items.filter((f) => f.monumentName?.toLowerCase().includes('konark') || f.monumentName?.toLowerCase().includes('puri'));
-      }
+    const placeId = parseInt(req.params.placeId);
+    if (!placeId) {
+      return res.status(400).json({ success: false, message: 'Invalid placeId.' });
     }
+
+    const foods = await prisma.food.findMany({
+      where: { placeId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        place: {
+          select: { id: true, name: true, slug: true, state: true },
+        },
+      },
+    });
 
     return res.json({
       success: true,
-      count: matches.length,
-      foods: matches,
+      count: foods.length,
+      foods,
       notice: 'Non-deliverable regional culinary heritage. For on-site tourism discovery only.',
     });
   } catch (error) {
@@ -339,36 +234,30 @@ export const createFoodItem = async (req, res) => {
       finalImageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
     }
 
-    const items = readFoodItems();
-    const newId = items.length > 0 ? Math.max(...items.map((i) => i.id || 0)) + 1 : 1;
+    const newFood = await prisma.food.create({
+      data: {
+        placeId: parseInt(placeId),
+        monumentName: monumentName || 'Heritage Monument',
+        name: name.trim(),
+        nameHi: nameHi?.trim() || null,
+        categoryType,
+        categoryTypeHi: categoryTypeHi || null,
+        diet: diet === 'non-veg' ? 'non-veg' : 'veg',
+        isDeliverable: false, // Never deliverable
+        famousSince: famousSince?.trim() || null,
+        shortLore: shortLore?.trim() || '',
+        shortLoreHi: shortLoreHi?.trim() || null,
+        famousSpots: famousSpots?.trim() || '',
+        famousSpotsHi: famousSpotsHi?.trim() || null,
+        priceRange: priceRange?.trim() || null,
+        imageUrl:
+          finalImageUrl ||
+          'https://images.unsplash.com/photo-1599785209707-a456fc1337bb?auto=format&fit=crop&w=800&q=80',
+        curatedBy: `Government Admin (${req.user?.email || 'admin'})`,
+      },
+    });
 
-    const newFood = {
-      id: newId,
-      placeId: parseInt(placeId),
-      monumentName: monumentName || 'Heritage Monument',
-      name: name.trim(),
-      nameHi: nameHi?.trim() || '',
-      categoryType,
-      categoryTypeHi,
-      diet: diet === 'non-veg' ? 'non-veg' : 'veg',
-      isDeliverable: false, // EXPLICIT SECURITY: Never deliverable
-      famousSince: famousSince.trim(),
-      shortLore: shortLore.trim(),
-      shortLoreHi: shortLoreHi.trim(),
-      famousSpots: famousSpots.trim(),
-      famousSpotsHi: famousSpotsHi.trim(),
-      priceRange: priceRange.trim(),
-      imageUrl:
-        finalImageUrl ||
-        'https://images.unsplash.com/photo-1599785209707-a456fc1337bb?auto=format&fit=crop&w=800&q=80',
-      curatedBy: `Government Admin (${req.user?.email || 'admin'})`,
-      createdAt: new Date().toISOString(),
-    };
-
-    items.unshift(newFood);
-    writeFoodItems(items);
-
-    console.log(`[Food Heritage] Admin created culinary item: ${newFood.name} for Place ID ${placeId}`);
+    console.log(`[Food Heritage] Admin created culinary item in MySQL: ${newFood.name} for Place ID ${placeId}`);
 
     return res.status(201).json({
       success: true,
@@ -385,17 +274,11 @@ export const createFoodItem = async (req, res) => {
 export const deleteFoodItem = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    let items = readFoodItems();
-    const existingIndex = items.findIndex((f) => f.id === id);
+    await prisma.food.delete({
+      where: { id },
+    });
 
-    if (existingIndex === -1) {
-      return res.status(404).json({ success: false, message: 'Food item not found.' });
-    }
-
-    items.splice(existingIndex, 1);
-    writeFoodItems(items);
-
-    return res.json({ success: true, message: 'Food item removed successfully.' });
+    return res.json({ success: true, message: 'Food item removed successfully from MySQL.' });
   } catch (error) {
     console.error('deleteFoodItem error:', error);
     return res.status(500).json({ success: false, message: 'Failed to delete food item.' });

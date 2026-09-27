@@ -96,6 +96,12 @@ export async function createProduct(req, res) {
       odopTag,
       category,
       placeId,
+      shopName,
+      shopAddress,
+      shopLandmark,
+      shopTiming,
+      phone,
+      whatsapp,
     } = req.body;
 
     if (!name || !price || !artisanName || !placeId) {
@@ -135,6 +141,12 @@ export async function createProduct(req, res) {
         category: category || 'handicraft',
         placeId: parseInt(placeId),
         rating: 5.0,
+        shopName: shopName || null,
+        shopAddress: shopAddress || null,
+        shopLandmark: shopLandmark || null,
+        shopTiming: shopTiming || null,
+        phone: phone || null,
+        whatsapp: whatsapp || null,
       },
       include: {
         place: {

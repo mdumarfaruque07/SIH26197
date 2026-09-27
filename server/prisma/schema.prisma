@@ -12,7 +12,7 @@ model User {
   name         String
   email        String     @unique
   passwordHash String     @map("password_hash")
-  role         String     @default("user") // 'user' or 'admin'
+  role         String     @default("user") // 'user', 'artisan', 'admin'
   avatarUrl    String?    @map("avatar_url")
   createdAt    DateTime   @default(now()) @map("created_at")
   posts        Post[]
@@ -22,23 +22,25 @@ model User {
 }
 
 model Place {
-  id               Int         @id @default(autoincrement())
-  name             String
-  slug             String      @unique
-  category         String      // 'monument', 'temple', 'fort', 'festival', 'natural'
-  state            String?
-  shortDescription String      @db.VarChar(500) @map("short_description")
-  fullStory        String      @db.Text @map("full_story")
-  latitude         Float
-  longitude        Float
-  coverImage       String      @map("cover_image")
-  youtubeVideoId   String?     @map("youtube_video_id")
-  audioNarrationUrl String?    @map("audio_narration_url")
-  createdAt        DateTime    @default(now()) @map("created_at")
-  mediaLinks       MediaLink[]
-  posts            Post[]
-  bookmarks        Bookmark[]
-  products         Product[]
+  id                  Int                  @id @default(autoincrement())
+  name                String
+  slug                String               @unique
+  category            String               // 'monument', 'temple', 'fort', 'festival', 'natural'
+  state               String?
+  shortDescription    String               @db.VarChar(500) @map("short_description")
+  fullStory           String               @db.Text @map("full_story")
+  latitude            Float
+  longitude           Float
+  coverImage          String               @map("cover_image")
+  youtubeVideoId      String?              @map("youtube_video_id")
+  audioNarrationUrl   String?              @map("audio_narration_url")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  mediaLinks          MediaLink[]
+  posts               Post[]
+  bookmarks           Bookmark[]
+  products            Product[]
+  foods               Food[]
+  artisanApplications ArtisanApplication[]
 
   @@map("places")
 }
@@ -84,18 +86,92 @@ model Bookmark {
 }
 
 model Product {
-  id          Int      @id @default(autoincrement())
-  placeId     Int      @map("place_id")
-  place       Place    @relation(fields: [placeId], references: [id], onDelete: Cascade)
-  name        String
-  description String   @db.Text
-  price       Float
-  imageUrl    String   @map("image_url")
-  artisanName String   @map("artisan_name")
-  odopTag     String?  @map("odop_tag")
-  category    String   // 'handicraft', 'attire', 'painting', 'pottery', 'souvenir'
-  rating      Float    @default(4.8)
-  createdAt   DateTime @default(now()) @map("created_at")
+  id           Int      @id @default(autoincrement())
+  placeId      Int      @map("place_id")
+  place        Place    @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  name         String
+  description  String   @db.Text
+  price        Float
+  imageUrl     String   @map("image_url")
+  artisanName  String   @map("artisan_name")
+  odopTag      String?  @map("odop_tag")
+  category     String   // 'handicraft', 'attire', 'painting', 'pottery', 'souvenir'
+  rating       Float    @default(4.8)
+  shopName     String?  @map("shop_name")
+  shopAddress  String?  @db.Text @map("shop_address")
+  shopLandmark String?  @map("shop_landmark")
+  shopTiming   String?  @map("shop_timing")
+  phone        String?
+  whatsapp     String?
+  createdAt    DateTime @default(now()) @map("created_at")
 
   @@map("products")
+}
+
+model Food {
+  id             Int      @id @default(autoincrement())
+  placeId        Int      @map("place_id")
+  place          Place    @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  monumentName   String   @map("monument_name")
+  name           String
+  nameHi         String?  @map("name_hi")
+  categoryType   String   @map("category_type")
+  categoryTypeHi String?  @map("category_type_hi")
+  diet           String   @default("veg") // 'veg' or 'non-veg'
+  isDeliverable  Boolean  @default(false) @map("is_deliverable")
+  famousSince    String?  @map("famous_since")
+  shortLore      String   @db.Text @map("short_lore")
+  shortLoreHi    String?  @db.Text @map("short_lore_hi")
+  famousSpots    String   @db.Text @map("famous_spots")
+  famousSpotsHi  String?  @db.Text @map("famous_spots_hi")
+  priceRange     String?  @map("price_range")
+  imageUrl       String   @map("image_url")
+  curatedBy      String?  @map("curated_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@map("foods")
+}
+
+model ArtisanApplication {
+  id               String    @id // e.g. 'APP-AGR-44910'
+  artisanName      String    @map("artisan_name")
+  shopName         String    @map("shop_name")
+  shopAddress      String    @db.Text @map("shop_address")
+  shopLandmark     String?   @map("shop_landmark")
+  shopTiming       String?   @map("shop_timing")
+  placeId          Int?      @map("place_id")
+  place            Place?    @relation(fields: [placeId], references: [id], onDelete: SetNull)
+  monumentName     String?   @map("monument_name")
+  monumentDistance String?   @map("monument_distance")
+  phone            String
+  whatsapp         String?
+  pehchanId        String?   @map("pehchan_id")
+  cooperativeName  String?   @map("cooperative_name")
+  clusterLocation  String?   @map("cluster_location")
+  craftType        String    @map("craft_type")
+  status           String    @default("PENDING") // 'PENDING', 'APPROVED', 'REJECTED'
+  activePlan       String?   @map("active_plan") // 'silver', 'gold', 'platinum'
+  submittedAt      DateTime  @default(now()) @map("submitted_at")
+  approvedAt       DateTime? @map("approved_at")
+  verifiedBy       String?   @map("verified_by")
+  adminNotes       String?   @db.Text @map("admin_notes")
+
+  @@map("artisan_applications")
+}
+
+model SupportTicket {
+  id                 Int      @id @default(autoincrement())
+  ticketNumber       String   @unique @map("ticket_number")
+  category           String
+  subject            String
+  description        String   @db.Text
+  contactEmail       String?  @map("contact_email")
+  contactPhone       String?  @map("contact_phone")
+  priority           String   @default("normal") // 'normal', 'high', 'urgent'
+  referenceId        String?  @map("reference_id")
+  monumentOrOrderRef String?  @map("monument_or_order_ref")
+  status             String   @default("OPEN") // 'OPEN', 'IN_REVIEW', 'RESOLVED'
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@map("support_tickets")
 }

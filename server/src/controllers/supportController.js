@@ -1,47 +1,10 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const ticketsFilePath = path.join(__dirname, '../../uploads/support_tickets.json');
-
-// Ensure directory and tickets storage exist
-const ensureStorage = () => {
-  const uploadsDir = path.join(__dirname, '../../uploads');
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-  }
-  if (!fs.existsSync(ticketsFilePath)) {
-    fs.writeFileSync(ticketsFilePath, JSON.stringify([], null, 2));
-  }
-};
-
-const readTickets = () => {
-  try {
-    ensureStorage();
-    const data = fs.readFileSync(ticketsFilePath, 'utf-8');
-    return JSON.parse(data || '[]');
-  } catch (err) {
-    console.error('Error reading support tickets:', err);
-    return [];
-  }
-};
-
-const writeTickets = (tickets) => {
-  try {
-    ensureStorage();
-    fs.writeFileSync(ticketsFilePath, JSON.stringify(tickets, null, 2));
-  } catch (err) {
-    console.error('Error writing support tickets:', err);
-  }
-};
+import prisma from '../prisma.js';
 
 export const createSupportTicket = async (req, res) => {
   try {
     const {
       category = 'App Bug',
-      subject = 'General Grievance',
+      subject = 'General Feedback & Support',
       description = '',
       contactEmail = '',
       contactPhone = '',
@@ -57,51 +20,60 @@ export const createSupportTicket = async (req, res) => {
       });
     }
 
-    const ticketNumber = `ASI-GRV-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
-    const attachmentUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    const ticketNumber = `SK-TKT-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
 
-    const newTicket = {
-      id: ticketNumber,
-      category,
-      subject,
-      description,
-      contactEmail: contactEmail || 'tourist@sanskritigo.in',
-      contactPhone: contactPhone || '',
-      priority,
-      referenceId: referenceId || monumentOrOrderRef,
-      attachmentUrl,
-      status: 'Under Review',
-      statusHi: 'समीक्षाधीन',
-      createdAt: new Date().toISOString(),
-      resolutionEstimate: '24-48 Hours',
-    };
+    const newTicket = await prisma.supportTicket.create({
+      data: {
+        ticketNumber,
+        category,
+        subject,
+        description,
+        contactEmail: contactEmail || 'user@sanskritikhoj.in',
+        contactPhone: contactPhone || null,
+        priority,
+        referenceId: referenceId || monumentOrOrderRef || null,
+        monumentOrOrderRef: monumentOrOrderRef || null,
+        status: 'OPEN',
+      },
+    });
 
-    const tickets = readTickets();
-    tickets.unshift(newTicket);
-    writeTickets(tickets);
-
-    console.log(`[Support] New grievance report filed: ${ticketNumber} [${category}]`);
+    console.log(`[Support] New ticket registered in MySQL: ${ticketNumber} [${category}]`);
 
     return res.status(201).json({
       success: true,
       message: 'Support ticket registered successfully.',
-      ticket: newTicket,
+      ticket: {
+        ...newTicket,
+        id: newTicket.ticketNumber,
+        status: 'Under Review',
+        statusHi: 'समीक्षाधीन',
+        resolutionEstimate: '24-48 Hours',
+      },
     });
   } catch (error) {
     console.error('Error submitting support ticket:', error);
     return res.status(500).json({
       success: false,
-      message: 'Failed to submit report. Please try again or call 1363.',
+      message: 'Failed to submit report. Please try again.',
     });
   }
 };
 
 export const getSupportTickets = async (req, res) => {
   try {
-    const tickets = readTickets();
+    const tickets = await prisma.supportTicket.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const formatted = tickets.map((t) => ({
+      ...t,
+      statusHi: t.status === 'RESOLVED' ? 'निस्तारित' : 'समीक्षाधीन',
+      resolutionEstimate: t.status === 'RESOLVED' ? 'Closed' : '24-48 Hours',
+    }));
+
     return res.json({
       success: true,
-      tickets,
+      tickets: formatted,
     });
   } catch (error) {
     console.error('Error fetching support tickets:', error);

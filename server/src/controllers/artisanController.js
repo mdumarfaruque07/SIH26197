@@ -1,12 +1,6 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import prisma from '../prisma.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const storageFilePath = path.join(__dirname, '../../uploads/artisan_applications.json');
-
-const INITIAL_APPLICATIONS = [
+export const INITIAL_APPLICATIONS = [
   {
     id: 'APP-AGR-44910',
     artisanName: 'Ustad Rashid & Sons',
@@ -14,7 +8,7 @@ const INITIAL_APPLICATIONS = [
     shopAddress: 'Shop 14, Near Taj West Gate, Tajganj, Agra, UP - 282001',
     shopLandmark: 'Opposite Royal Gate Heritage Entry (350m from Taj Mahal)',
     shopTiming: '09:00 AM - 08:30 PM (Daily)',
-    placeId: '1',
+    placeId: 1,
     monumentName: 'Taj Mahal (Agra)',
     monumentDistance: '350m',
     phone: '+91 98370 12345',
@@ -25,8 +19,8 @@ const INITIAL_APPLICATIONS = [
     craftType: 'Makrana Marble Inlay / Pietra Dura (पच्चीकारी)',
     status: 'APPROVED',
     activePlan: 'gold',
-    submittedAt: '2026-01-10T10:30:00.000Z',
-    approvedAt: '2026-01-11T14:15:00.000Z',
+    submittedAt: new Date('2026-01-10T10:30:00.000Z'),
+    approvedAt: new Date('2026-01-11T14:15:00.000Z'),
     verifiedBy: 'ASI Heritage Directorate (Dr. V. Sharma)',
     adminNotes: 'Physical workshop verified by Regional Tourism Officer. 100% authentic Makrana marble with semi-precious stone inlay.',
   },
@@ -37,7 +31,7 @@ const INITIAL_APPLICATIONS = [
     shopAddress: 'K-22/41, Madanpura Silk Lane, Near Godowlia Chowk, Varanasi, UP - 221001',
     shopLandmark: 'Adjacent to Silk Heritage Walk (850m from Dashashwamedh Ghat)',
     shopTiming: '10:00 AM - 09:00 PM',
-    placeId: '5',
+    placeId: 5,
     monumentName: 'Kashi Vishwanath & Ganga Ghats',
     monumentDistance: '850m',
     phone: '+91 94152 67890',
@@ -48,7 +42,8 @@ const INITIAL_APPLICATIONS = [
     craftType: 'Handloom Pure Silk Banarasi Saree & Brocades (बनारसी ज़री)',
     status: 'PENDING',
     activePlan: null,
-    submittedAt: '2026-02-01T11:00:00.000Z',
+    submittedAt: new Date('2026-02-01T11:00:00.000Z'),
+    approvedAt: null,
     verifiedBy: 'Pending District Handicrafts Review',
     adminNotes: 'Awaiting physically signed verification deed from Varanasi District Industries Centre (DIC).',
   },
@@ -58,66 +53,44 @@ const INITIAL_APPLICATIONS = [
     shopName: 'Master Kripal Blue Pottery Art Emporium',
     shopAddress: 'B-18, Shiv Marg, Near Amer Road Heritage Walk, Jaipur, Rajasthan - 302002',
     shopLandmark: 'On Amer-Jaipur Heritage Boulevard, near Jal Mahal view point',
-    shopTiming: '09:30 AM - 08:30 PM (Daily)',
-    placeId: '6',
-    monumentName: 'Amer Fort (Jaipur)',
+    shopTiming: '10:00 AM - 08:00 PM (Daily)',
+    placeId: 4,
+    monumentName: 'Amer Fort & Jaipur Heritage',
     monumentDistance: '1.2km',
-    phone: '+91 94140 77890',
-    whatsapp: '919414077890',
+    phone: '+91 98290 54321',
+    whatsapp: '919829054321',
     pehchanId: 'RJ-JPR-20419',
-    cooperativeName: 'Rajasthan Small Industries Handicrafts Union',
-    clusterLocation: 'Kot Jewar Pottery Cluster, Jaipur (302001)',
-    craftType: 'Jaipur Blue Pottery (पारंपरिक नीली मिट्टी के बर्तन)',
-    status: 'APPROVED',
-    activePlan: 'platinum',
-    submittedAt: '2026-01-05T09:00:00.000Z',
-    approvedAt: '2026-01-06T12:00:00.000Z',
-    verifiedBy: 'Rajasthan Tourism & Crafts Board',
-    adminNotes: 'Certified authentic dough-less pottery with cobalt oxide glaze. Verified 40-year generational workshop.',
+    cooperativeName: 'Jaipur Blue Pottery Heritage Trust',
+    clusterLocation: 'Kot Jewar & Amer Craft Hub, Jaipur',
+    craftType: 'Traditional Jaipur Blue Pottery (क्वार्ट्ज़ व मुल्तानी मिट्टी हस्तकला)',
+    status: 'PENDING',
+    activePlan: null,
+    submittedAt: new Date('2026-02-05T14:00:00.000Z'),
+    approvedAt: null,
+    verifiedBy: 'Pending District Handicrafts Review',
+    adminNotes: 'Workshop photos uploaded. Pending field inspection by Rajasthan Handicrafts Development Officer.',
   },
 ];
 
-const ensureStorage = () => {
-  const uploadsDir = path.join(__dirname, '../../uploads');
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-  }
-  if (!fs.existsSync(storageFilePath)) {
-    fs.writeFileSync(storageFilePath, JSON.stringify(INITIAL_APPLICATIONS, null, 2));
-  }
-};
-
-const readApplications = () => {
+export const getAllApplications = async (req, res) => {
   try {
-    ensureStorage();
-    const data = fs.readFileSync(storageFilePath, 'utf-8');
-    const parsed = JSON.parse(data || '[]');
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_APPLICATIONS;
-  } catch (err) {
-    console.error('Error reading artisan applications:', err);
-    return INITIAL_APPLICATIONS;
-  }
-};
+    const apps = await prisma.artisanApplication.findMany({
+      orderBy: { submittedAt: 'desc' },
+      include: {
+        place: {
+          select: { id: true, name: true, slug: true, state: true },
+        },
+      },
+    });
 
-const writeApplications = (apps) => {
-  try {
-    ensureStorage();
-    fs.writeFileSync(storageFilePath, JSON.stringify(apps, null, 2));
-  } catch (err) {
-    console.error('Error writing artisan applications:', err);
-  }
-};
-
-export const getAllApplications = (req, res) => {
-  try {
-    const apps = readApplications();
     return res.json({ success: true, applications: apps });
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
+    console.error('getAllApplications error:', err);
+    return res.status(500).json({ success: false, message: 'Failed to fetch applications.' });
   }
 };
 
-export const submitApplication = (req, res) => {
+export const submitApplication = async (req, res) => {
   try {
     const {
       artisanName,
@@ -142,36 +115,33 @@ export const submitApplication = (req, res) => {
       });
     }
 
-    const apps = readApplications();
     const cityCode = pehchanId.slice(3, 6).toUpperCase() || 'HER';
     const randomId = Math.floor(10000 + Math.random() * 90000);
     const newId = `APP-${cityCode}-${randomId}`;
 
-    const newApp = {
-      id: newId,
-      artisanName: artisanName || `${shopName} Master Artisan`,
-      shopName,
-      shopAddress: shopAddress || 'Physical Workshop near Monument',
-      shopLandmark: shopLandmark || 'Near Monument Heritage Gate',
-      shopTiming: shopTiming || '10:00 AM - 08:00 PM',
-      placeId: placeId || '1',
-      monumentName: monumentName || 'Associated Heritage Monument',
-      monumentDistance: 'Within 1km of Site',
-      phone,
-      whatsapp: whatsapp || phone,
-      pehchanId: pehchanId.toUpperCase(),
-      cooperativeName: cooperativeName || 'National Handicrafts Development Society',
-      clusterLocation: clusterLocation || 'Registered Crafts Cluster',
-      craftType: craftType || 'Regional ODOP Craft & Traditional Art',
-      status: 'PENDING',
-      activePlan: null,
-      submittedAt: new Date().toISOString(),
-      verifiedBy: 'Pending District Handicrafts Review',
-      adminNotes: 'New shop application submitted via Artisan Portal. Under physical address verification review.',
-    };
-
-    apps.unshift(newApp);
-    writeApplications(apps);
+    const newApp = await prisma.artisanApplication.create({
+      data: {
+        id: newId,
+        artisanName: artisanName || `${shopName} Master Artisan`,
+        shopName,
+        shopAddress: shopAddress || 'Physical Workshop near Monument',
+        shopLandmark: shopLandmark || 'Near Monument Heritage Gate',
+        shopTiming: shopTiming || '10:00 AM - 08:00 PM',
+        placeId: placeId ? parseInt(placeId) : null,
+        monumentName: monumentName || 'Associated Heritage Monument',
+        monumentDistance: 'Within 1km of Site',
+        phone,
+        whatsapp: whatsapp || phone,
+        pehchanId: pehchanId.toUpperCase(),
+        cooperativeName: cooperativeName || 'National Handicrafts Development Society',
+        clusterLocation: clusterLocation || 'Registered Crafts Cluster',
+        craftType: craftType || 'Regional ODOP Craft & Traditional Art',
+        status: 'PENDING',
+        activePlan: null,
+        verifiedBy: 'Pending District Handicrafts Review',
+        adminNotes: 'New shop application submitted via Artisan Portal. Under physical address verification review.',
+      },
+    });
 
     return res.status(201).json({
       success: true,
@@ -179,11 +149,12 @@ export const submitApplication = (req, res) => {
       application: newApp,
     });
   } catch (err) {
+    console.error('submitApplication error:', err);
     return res.status(500).json({ success: false, message: err.message });
   }
 };
 
-export const updateApplicationStatus = (req, res) => {
+export const updateApplicationStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status, notes } = req.body;
@@ -192,51 +163,48 @@ export const updateApplicationStatus = (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid status value.' });
     }
 
-    const apps = readApplications();
-    const idx = apps.findIndex((a) => a.id === id);
-    if (idx === -1) {
-      return res.status(404).json({ success: false, message: 'Application not found.' });
-    }
-
-    apps[idx].status = status;
-    if (notes) apps[idx].adminNotes = notes;
+    const updateData = {
+      status,
+    };
+    if (notes) updateData.adminNotes = notes;
     if (status === 'APPROVED') {
-      apps[idx].approvedAt = new Date().toISOString();
-      apps[idx].verifiedBy = 'Government Tourism Admin (Verified)';
+      updateData.approvedAt = new Date();
+      updateData.verifiedBy = 'Government Tourism Admin (Verified)';
     }
 
-    writeApplications(apps);
+    const updated = await prisma.artisanApplication.update({
+      where: { id },
+      data: updateData,
+    });
 
     return res.json({
       success: true,
       message: `Application ${id} status updated to ${status}.`,
-      application: apps[idx],
+      application: updated,
     });
   } catch (err) {
+    console.error('updateApplicationStatus error:', err);
     return res.status(500).json({ success: false, message: err.message });
   }
 };
 
-export const updateApplicationPlan = (req, res) => {
+export const updateApplicationPlan = async (req, res) => {
   try {
     const { id } = req.params;
     const { plan } = req.body;
 
-    const apps = readApplications();
-    const idx = apps.findIndex((a) => a.id === id);
-    if (idx === -1) {
-      return res.status(404).json({ success: false, message: 'Application not found.' });
-    }
-
-    apps[idx].activePlan = plan;
-    writeApplications(apps);
+    const updated = await prisma.artisanApplication.update({
+      where: { id },
+      data: { activePlan: plan },
+    });
 
     return res.json({
       success: true,
       message: `Application ${id} subscription plan set to ${plan}.`,
-      application: apps[idx],
+      application: updated,
     });
   } catch (err) {
+    console.error('updateApplicationPlan error:', err);
     return res.status(500).json({ success: false, message: err.message });
   }
 };

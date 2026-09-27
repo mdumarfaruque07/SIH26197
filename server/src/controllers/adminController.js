@@ -2,10 +2,13 @@ import prisma from '../prisma.js';
 
 export async function getDashboardStats(req, res) {
   try {
-    const [totalUsers, totalPlaces, totalPosts, recentPosts] = await Promise.all([
+    const [totalUsers, totalPlaces, totalPosts, totalProducts, totalArtisans, totalFoods, recentPosts] = await Promise.all([
       prisma.user.count(),
       prisma.place.count(),
       prisma.post.count(),
+      prisma.product.count(),
+      prisma.artisanApplication.count(),
+      prisma.food.count(),
       prisma.post.findMany({
         take: 5,
         orderBy: { createdAt: 'desc' },
@@ -22,6 +25,9 @@ export async function getDashboardStats(req, res) {
         totalUsers,
         totalPlaces,
         totalPosts,
+        totalProducts,
+        totalArtisans,
+        totalFoods,
         recentPosts,
       },
     });
