@@ -254,6 +254,14 @@ From Android Studio, click **Build > Build Bundle(s) / APK(s) > Build APK(s)** t
 
 ---
 
+## 👥 6-Member Team Roles & Presentation Guide
+
+For complete details on team role division, pitch timeline, 90-second demo scripts, and jury Q&A preparation, see:
+👉 [**TEAM_ROLES_AND_PITCH_GUIDE.md**](file:///c:/Users/Mduma/Downloads/SIH26197/TEAM_ROLES_AND_PITCH_GUIDE.md)
+
+---
+
 ## 👥 Contributors & Acknowledgements
 - Developed for the preservation and promotion of Indian cultural heritage, monuments, and hereditary craftsmanship.
 - Powered by open cultural data, archaeological records, and community contributors across India.
+

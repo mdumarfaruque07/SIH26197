@@ -172,6 +172,8 @@ export const getAllFoods = async (req, res) => {
   }
 };
 
+export const getAllFood = getAllFoods;
+
 // GET food by placeId
 export const getFoodByPlace = async (req, res) => {
   try {

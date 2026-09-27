@@ -22,7 +22,7 @@ export const getApiBaseUrl = () => {
     window.Capacitor.isNativePlatform();
 
   if (isCapacitor) {
-    return 'http://10.0.2.2:5000/api';
+    return 'http://10.168.182.153:5000/api';
   }
 
   // If accessed directly on mobile browser via computer IP (e.g. http://192.168.x.x:5173)
