@@ -12,6 +12,7 @@ import productRoutes from './routes/productRoutes.js';
 import supportRoutes from './routes/supportRoutes.js';
 import foodRoutes from './routes/foodRoutes.js';
 import artisanRoutes from './routes/artisanRoutes.js';
+import ttsRoutes from './routes/ttsRoutes.js';
 
 dotenv.config();
 
@@ -55,6 +56,7 @@ app.use('/api/food', foodRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/artisan-verification', artisanRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/tts', ttsRoutes);
 
 // 404 Handler
 app.use((req, res) => {

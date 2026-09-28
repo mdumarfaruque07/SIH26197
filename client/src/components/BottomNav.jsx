@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Compass, Map, Search, ShoppingBag, User } from 'lucide-react';
 import { useKeyboardVisible } from '../hooks/useKeyboardVisible';
@@ -8,15 +8,24 @@ export default function BottomNav({ onOpenSearch }) {
   const location = useLocation();
   const isKeyboardVisible = useKeyboardVisible();
   const { lang, t } = useLanguage();
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // Hide bottom navigation bar on authentication screens or when mobile virtual keyboard is active
+  useEffect(() => {
+    const handler = (e) => {
+      setIsDrawerOpen(Boolean(e.detail?.open));
+    };
+    window.addEventListener('sanskriti_comment_drawer_toggle', handler);
+    return () => window.removeEventListener('sanskriti_comment_drawer_toggle', handler);
+  }, []);
+
+  // Hide bottom navigation bar on authentication screens, when mobile keyboard is active, or when comment drawer popup is open
   const isAuthRoute =
     location.pathname.startsWith('/login') ||
     location.pathname.startsWith('/register') ||
     location.pathname.includes('/login') ||
     location.pathname.includes('/register');
 
-  if (isAuthRoute || isKeyboardVisible) {
+  if (isAuthRoute || isKeyboardVisible || isDrawerOpen) {
     return null;
   }
 

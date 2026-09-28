@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import {
   Heart,
@@ -155,6 +156,27 @@ export default function InstagramPostCard({ post, onLikeChange, onPostDelete, on
   const [isBouncing, setIsBouncing] = useState(false);
   const [copiedShare, setCopiedShare] = useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+
+  // When comment drawer is open, lock body scroll and hide bottom navigation bar
+  useEffect(() => {
+    if (isCommentDrawerOpen) {
+      document.body.style.overflow = 'hidden';
+      window.dispatchEvent(
+        new CustomEvent('sanskriti_comment_drawer_toggle', { detail: { open: true } })
+      );
+    } else {
+      document.body.style.overflow = '';
+      window.dispatchEvent(
+        new CustomEvent('sanskriti_comment_drawer_toggle', { detail: { open: false } })
+      );
+    }
+    return () => {
+      document.body.style.overflow = '';
+      window.dispatchEvent(
+        new CustomEvent('sanskriti_comment_drawer_toggle', { detail: { open: false } })
+      );
+    };
+  }, [isCommentDrawerOpen]);
 
   // Edit and Delete states
   const [isEditing, setIsEditing] = useState(false);
@@ -963,195 +985,196 @@ export default function InstagramPostCard({ post, onLikeChange, onPostDelete, on
       {/* ========================================================================= */}
       {/* INSTAGRAM-STYLE BOTTOM SHEET COMMENTS DRAWER POPUP                        */}
       {/* ========================================================================= */}
-      {isCommentDrawerOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center animate-fadeIn">
-          {/* Dark blurred backdrop */}
-          <div
-            onClick={() => setIsCommentDrawerOpen(false)}
-            className="absolute inset-0 bg-black/60 backdrop-blur-xs transition-opacity cursor-pointer"
-          />
+      {isCommentDrawerOpen &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div className="fixed inset-0 z-[100000] flex items-end sm:items-center justify-center animate-fadeIn">
+            {/* Dark blurred backdrop */}
+            <div
+              onClick={() => setIsCommentDrawerOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-xs transition-opacity cursor-pointer"
+            />
 
-          {/* Drawer Container (Slides up from bottom) */}
-          <div
-            className="relative w-full sm:max-w-lg bg-white rounded-t-[32px] sm:rounded-3xl shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[80vh] h-[78vh] animate-slide-up overflow-hidden z-10 border border-stone-200"
-          >
-            {/* 1. Pull Bar & Top Header */}
-            <div className="pt-3 pb-2.5 px-4 border-b border-stone-100 flex-shrink-0 relative bg-white">
-              {/* Drag Handle Bar */}
-              <div
-                onClick={() => setIsCommentDrawerOpen(false)}
-                className="w-10 h-1 bg-stone-300 hover:bg-stone-400 rounded-full mx-auto mb-2 cursor-pointer transition-colors"
-              />
-
-              <div className="flex items-center justify-between">
-                <div className="w-7" /> {/* spacer for centering title */}
-
-                <div className="flex items-center gap-1.5 font-bold text-stone-900 text-sm">
-                  <span>{lang === 'hi' ? 'टिप्पणियाँ' : 'Comments'}</span>
-                  <span className="text-xs text-stone-400 font-semibold">({comments.length})</span>
-                </div>
-
-                <button
-                  type="button"
+            {/* Drawer Container (Slides up from bottom) */}
+            <div className="relative w-full sm:max-w-lg bg-white rounded-t-[32px] sm:rounded-3xl shadow-2xl flex flex-col max-h-[88vh] sm:max-h-[82vh] h-[80vh] animate-slide-up overflow-hidden z-20 border border-stone-200">
+              {/* 1. Pull Bar & Top Header */}
+              <div className="pt-3 pb-2.5 px-4 border-b border-stone-100 flex-shrink-0 relative bg-white">
+                {/* Drag Handle Bar */}
+                <div
                   onClick={() => setIsCommentDrawerOpen(false)}
-                  className="p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded-full transition-colors cursor-pointer"
-                  aria-label="Close comments"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
+                  className="w-10 h-1 bg-stone-300 hover:bg-stone-400 rounded-full mx-auto mb-2 cursor-pointer transition-colors"
+                />
 
-            {/* 2. Scrollable Body */}
-            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-              {/* Original Post Author Caption Card (Pinned at top of comments) */}
-              {currentCaption && (
-                <div className="flex items-start gap-3 pb-3 border-b border-stone-100">
-                  <img
-                    src={userAvatar}
-                    alt={post.user?.name || 'Author'}
-                    className="w-9 h-9 rounded-full object-cover border border-stone-200 flex-shrink-0 mt-0.5"
-                  />
-                  <div className="flex-1 min-w-0 text-xs">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-bold text-stone-900">{post.user?.name || 'Explorer'}</span>
-                      <span className="text-[10px] text-stone-400">• {postDate}</span>
-                    </div>
-                    <p className="text-stone-800 mt-0.5 leading-relaxed whitespace-pre-wrap">{currentCaption}</p>
-                    <div className="mt-1 flex flex-wrap gap-1 text-[11px] text-heritage-600 font-medium">
-                      <span>#IncredibleIndia</span>
-                      <span>#{placeName.replace(/[^a-zA-Z0-9]/g, '')}</span>
-                    </div>
+                <div className="flex items-center justify-between">
+                  <div className="w-7" /> {/* spacer for centering title */}
+
+                  <div className="flex items-center gap-1.5 font-bold text-stone-900 text-sm">
+                    <span>{lang === 'hi' ? 'टिप्पणियाँ' : 'Comments'}</span>
+                    <span className="text-xs text-stone-400 font-semibold">({comments.length})</span>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsCommentDrawerOpen(false)}
+                    className="p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded-full transition-colors cursor-pointer"
+                    aria-label="Close comments"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
-              )}
-
-              {/* Comments Stream */}
-              <div className="space-y-4">
-                {comments.length === 0 ? (
-                  <div className="py-12 text-center space-y-2">
-                    <div className="w-12 h-12 rounded-full bg-stone-100 text-stone-400 flex items-center justify-center mx-auto">
-                      <MessageCircle className="w-6 h-6" />
-                    </div>
-                    <div className="font-bold text-xs text-stone-800">
-                      {lang === 'hi' ? 'अभी कोई टिप्पणी नहीं है' : 'No comments yet'}
-                    </div>
-                    <p className="text-[11px] text-stone-400 max-w-xs mx-auto">
-                      {lang === 'hi'
-                        ? 'इस धरोहर स्थल के बारे में बातचीत शुरू करने वाले पहले व्यक्ति बनें!'
-                        : 'Start the conversation! Share your visit thoughts or questions.'}
-                    </p>
-                  </div>
-                ) : (
-                  comments.map((c) => {
-                    const isLiked = Boolean(commentLikes[c.id]);
-                    return (
-                      <div key={c.id} className="flex items-start gap-3 text-xs group">
-                        <img
-                          src={c.avatar}
-                          alt={c.author}
-                          className="w-8 h-8 rounded-full object-cover border border-stone-200 flex-shrink-0 mt-0.5"
-                        />
-                        <div className="flex-1 min-w-0 space-y-1">
-                          <div>
-                            <span className="font-bold text-stone-900 mr-1.5">{c.author}</span>
-                            <span className="text-stone-800 leading-relaxed">{c.text}</span>
-                          </div>
-                          <div className="flex items-center gap-3 text-[10px] text-stone-400 font-medium">
-                            <span>{c.timeAgo || 'Just now'}</span>
-                            <button
-                              type="button"
-                              onClick={() => setNewComment(`@${c.author} `)}
-                              className="text-stone-500 font-bold hover:text-stone-900 cursor-pointer"
-                            >
-                              Reply
-                            </button>
-                            {isLiked && <span className="text-rose-600 font-bold">1 like</span>}
-                          </div>
-                        </div>
-
-                        {/* Like button for comment */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCommentLikes((prev) => ({
-                              ...prev,
-                              [c.id]: !prev[c.id],
-                            }));
-                          }}
-                          className="p-1 text-stone-400 hover:text-rose-500 transition-colors cursor-pointer mt-0.5"
-                          title="Like comment"
-                        >
-                          <Heart
-                            className={`w-3.5 h-3.5 ${
-                              isLiked ? 'fill-rose-500 text-rose-500' : 'text-stone-300 hover:text-stone-500'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                    );
-                  })
-                )}
               </div>
-            </div>
 
-            {/* 3. Quick Emojis Bar (Instagram Style) */}
-            <div className="px-4 py-1.5 bg-stone-50 border-t border-stone-100 flex items-center justify-between gap-1 overflow-x-auto no-scrollbar flex-shrink-0">
-              {['❤️', '🙌', '🔥', '👏', '✨', '😍', '🙏', '🇮🇳'].map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => setNewComment((prev) => prev + emoji)}
-                  className="p-1 hover:scale-125 transition-transform text-sm cursor-pointer select-none"
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
+              {/* 2. Scrollable Body */}
+              <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+                {/* Original Post Author Caption Card (Pinned at top of comments) */}
+                {currentCaption && (
+                  <div className="flex items-start gap-3 pb-3 border-b border-stone-100">
+                    <img
+                      src={userAvatar}
+                      alt={post.user?.name || 'Author'}
+                      className="w-9 h-9 rounded-full object-cover border border-stone-200 flex-shrink-0 mt-0.5"
+                    />
+                    <div className="flex-1 min-w-0 text-xs">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-stone-900">{post.user?.name || 'Explorer'}</span>
+                        <span className="text-[10px] text-stone-400">• {postDate}</span>
+                      </div>
+                      <p className="text-stone-800 mt-0.5 leading-relaxed whitespace-pre-wrap">{currentCaption}</p>
+                      <div className="mt-1 flex flex-wrap gap-1 text-[11px] text-heritage-600 font-medium">
+                        <span>#IncredibleIndia</span>
+                        <span>#{placeName.replace(/[^a-zA-Z0-9]/g, '')}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-            {/* 4. Bottom Sticky Input Form */}
-            <form
-              onSubmit={(e) => {
-                handleAddComment(e);
-              }}
-              className="p-3 sm:p-4 bg-white border-t border-stone-200 flex items-center gap-2.5 flex-shrink-0"
-            >
-              <img
-                src={
-                  user?.avatarUrl ||
-                  `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user?.name || 'You')}`
-                }
-                alt="Your avatar"
-                className="w-8 h-8 rounded-full object-cover border border-stone-200 flex-shrink-0"
-              />
-              <input
-                type="text"
-                autoFocus
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder={
-                  lang === 'hi'
-                    ? `${post.user?.name || 'यात्री'} के लिए एक टिप्पणी लिखें...`
-                    : `Add a comment for ${post.user?.name || 'explorer'}...`
-                }
-                className="flex-1 bg-stone-100 hover:bg-stone-150 focus:bg-stone-50 px-3.5 py-2.5 rounded-full text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-amber-500"
-              />
-              <button
-                type="submit"
-                disabled={!newComment.trim()}
-                className={`px-3.5 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-1 ${
-                  newComment.trim()
-                    ? 'bg-gradient-to-r from-amber-600 to-rose-600 text-white shadow-sm cursor-pointer hover:opacity-90'
-                    : 'bg-stone-100 text-stone-400 cursor-not-allowed'
-                }`}
+                {/* Comments Stream */}
+                <div className="space-y-4">
+                  {comments.length === 0 ? (
+                    <div className="py-12 text-center space-y-2">
+                      <div className="w-12 h-12 rounded-full bg-stone-100 text-stone-400 flex items-center justify-center mx-auto">
+                        <MessageCircle className="w-6 h-6" />
+                      </div>
+                      <div className="font-bold text-xs text-stone-800">
+                        {lang === 'hi' ? 'अभी कोई टिप्पणी नहीं है' : 'No comments yet'}
+                      </div>
+                      <p className="text-[11px] text-stone-400 max-w-xs mx-auto">
+                        {lang === 'hi'
+                          ? 'इस धरोहर स्थल के बारे में बातचीत शुरू करने वाले पहले व्यक्ति बनें!'
+                          : 'Start the conversation! Share your visit thoughts or questions.'}
+                      </p>
+                    </div>
+                  ) : (
+                    comments.map((c) => {
+                      const isLiked = Boolean(commentLikes[c.id]);
+                      return (
+                        <div key={c.id} className="flex items-start gap-3 text-xs group">
+                          <img
+                            src={c.avatar}
+                            alt={c.author}
+                            className="w-8 h-8 rounded-full object-cover border border-stone-200 flex-shrink-0 mt-0.5"
+                          />
+                          <div className="flex-1 min-w-0 space-y-1">
+                            <div>
+                              <span className="font-bold text-stone-900 mr-1.5">{c.author}</span>
+                              <span className="text-stone-800 leading-relaxed">{c.text}</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-[10px] text-stone-400 font-medium">
+                              <span>{c.timeAgo || 'Just now'}</span>
+                              <button
+                                type="button"
+                                onClick={() => setNewComment(`@${c.author} `)}
+                                className="text-stone-500 font-bold hover:text-stone-900 cursor-pointer"
+                              >
+                                Reply
+                              </button>
+                              {isLiked && <span className="text-rose-600 font-bold">1 like</span>}
+                            </div>
+                          </div>
+
+                          {/* Like button for comment */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCommentLikes((prev) => ({
+                                ...prev,
+                                [c.id]: !prev[c.id],
+                              }));
+                            }}
+                            className="p-1 text-stone-400 hover:text-rose-500 transition-colors cursor-pointer mt-0.5"
+                            title="Like comment"
+                          >
+                            <Heart
+                              className={`w-3.5 h-3.5 ${
+                                isLiked ? 'fill-rose-500 text-rose-500' : 'text-stone-300 hover:text-stone-500'
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* 3. Quick Emojis Bar (Instagram Style) */}
+              <div className="px-4 py-1.5 bg-stone-50 border-t border-stone-100 flex items-center justify-between gap-1 overflow-x-auto no-scrollbar flex-shrink-0">
+                {['❤️', '🙌', '🔥', '👏', '✨', '😍', '🙏', '🇮🇳'].map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => setNewComment((prev) => prev + emoji)}
+                    className="p-1 hover:scale-125 transition-transform text-sm cursor-pointer select-none"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+
+              {/* 4. Bottom Sticky Input Form (Highly visible with safe padding) */}
+              <form
+                onSubmit={(e) => {
+                  handleAddComment(e);
+                }}
+                className="px-3.5 pt-3 pb-6 sm:pb-3.5 bg-white border-t border-stone-200 flex items-center gap-2.5 flex-shrink-0 relative z-30 shadow-lg"
               >
-                <span>{lang === 'hi' ? 'भेजें' : 'Post'}</span>
-                <Send className="w-3 h-3" />
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+                <img
+                  src={
+                    user?.avatarUrl ||
+                    `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user?.name || 'You')}`
+                  }
+                  alt="Your avatar"
+                  className="w-9 h-9 rounded-full object-cover border border-amber-300 flex-shrink-0 shadow-2xs"
+                />
+                <input
+                  type="text"
+                  autoFocus
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder={
+                    lang === 'hi'
+                      ? `${post.user?.name || 'यात्री'} के लिए एक टिप्पणी लिखें...`
+                      : `Add a comment for ${post.user?.name || 'explorer'}...`
+                  }
+                  className="flex-1 bg-stone-100 hover:bg-stone-50 focus:bg-white px-4 py-2.5 rounded-full text-xs sm:text-sm text-stone-900 font-medium placeholder-stone-500 border border-stone-200 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all shadow-inner"
+                />
+                <button
+                  type="submit"
+                  disabled={!newComment.trim()}
+                  className={`px-4 py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 flex-shrink-0 ${
+                    newComment.trim()
+                      ? 'bg-gradient-to-r from-amber-600 to-rose-600 text-white shadow-md cursor-pointer hover:opacity-95 active:scale-95'
+                      : 'bg-stone-100 text-stone-400 cursor-not-allowed'
+                  }`}
+                >
+                  <span>{lang === 'hi' ? 'भेजें' : 'Post'}</span>
+                  <Send className="w-3.5 h-3.5" />
+                </button>
+              </form>
+            </div>
+          </div>,
+          document.body
+        )}
     </article>
   );
 }
