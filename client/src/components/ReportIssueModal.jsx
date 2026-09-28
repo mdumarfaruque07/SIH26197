@@ -191,6 +191,7 @@ export default function ReportIssueModal({ isOpen, onClose, onTicketCreated }) {
         const existing = JSON.parse(localStorage.getItem('sanskriti_support_tickets') || localStorage.getItem('sih_support_tickets') || '[]');
         const updated = [newTicketData, ...existing];
         localStorage.setItem('sanskriti_support_tickets', JSON.stringify(updated));
+        window.dispatchEvent(new Event('sanskriti_ticket_created'));
       } catch (storageErr) {
         console.error('LocalStorage ticket save error:', storageErr);
       }

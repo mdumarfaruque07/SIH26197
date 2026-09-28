@@ -142,11 +142,7 @@ export default function PostModal({ isOpen, onClose, onSuccess, initialPlaceId =
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!user) {
-      setError('Please login first to share your visit photo.');
-      return;
-    }
-
+    // If user is guest, continue smoothly with guest attribution
     if (!placeId) {
       setError('Please select a heritage place.');
       return;
@@ -178,7 +174,15 @@ export default function PostModal({ isOpen, onClose, onSuccess, initialPlaceId =
       }
 
       const res = await postService.create(formData);
-      if (res.success) {
+      if (res.success && res.post) {
+        // Record created post id to my posts tracker
+        try {
+          const ids = JSON.parse(localStorage.getItem('sanskriti_my_post_ids') || '[]');
+          if (!ids.includes(res.post.id)) {
+            localStorage.setItem('sanskriti_my_post_ids', JSON.stringify([res.post.id, ...ids]));
+          }
+        } catch {}
+        window.dispatchEvent(new Event('sanskriti_my_posts_changed'));
         onSuccess && onSuccess(res.post);
         onClose();
       } else {

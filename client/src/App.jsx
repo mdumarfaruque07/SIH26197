@@ -18,6 +18,7 @@ import BottomNav from './components/BottomNav';
 import MenuDrawer from './components/MenuDrawer';
 import SearchModal from './components/SearchModal';
 import PermissionModal from './components/PermissionModal';
+import ServerConfigModal from './components/ServerConfigModal';
 import { Landmark, Heart } from 'lucide-react';
 
 function AppContent() {
@@ -26,6 +27,7 @@ function AppContent() {
   const [postModalPlaceId, setPostModalPlaceId] = useState(null);
   const [menuDrawerOpen, setMenuDrawerOpen] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const [serverConfigOpen, setServerConfigOpen] = useState(false);
 
   const handleOpenPostModal = (placeId = null) => {
     setPostModalPlaceId(placeId);
@@ -107,12 +109,19 @@ function AppContent() {
         isOpen={menuDrawerOpen}
         onClose={() => setMenuDrawerOpen(false)}
         onOpenPostModal={handleOpenPostModal}
+        onOpenServerConfig={() => setServerConfigOpen(true)}
       />
 
       {/* Quick Search Modal */}
       <SearchModal
         isOpen={searchModalOpen}
         onClose={() => setSearchModalOpen(false)}
+      />
+
+      {/* Backend Server Connection & IP Configuration Modal */}
+      <ServerConfigModal
+        isOpen={serverConfigOpen}
+        onClose={() => setServerConfigOpen(false)}
       />
 
       {/* Global Post Visit Photo & Rating Modal */}

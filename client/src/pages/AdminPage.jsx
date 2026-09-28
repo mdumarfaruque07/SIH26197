@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { adminService, placeService, postService, foodService, artisanVerificationService } from '../services/api';
+import {
+  adminService,
+  placeService,
+  postService,
+  foodService,
+  artisanVerificationService,
+  supportService,
+  setLocalCachedData,
+  getLocalCachedData,
+} from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import {
   ShieldCheck,
@@ -34,6 +43,12 @@ import {
   XCircle,
   FileText,
   Check,
+  Upload,
+  Image as ImageIcon,
+  HelpCircle,
+  Mail,
+  Search,
+  RefreshCw,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -47,11 +62,27 @@ export default function AdminPage() {
   const [editingPlace, setEditingPlace] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState({ type: '', message: '' });
+  const [aiLoading, setAiLoading] = useState(false);
+
+  // Image Upload States (Supports offline & local file upload)
+  const [coverImageFile, setCoverImageFile] = useState(null);
+  const [coverImagePreview, setCoverImagePreview] = useState('');
+  const [editingCoverImageFile, setEditingCoverImageFile] = useState(null);
+  const [editingCoverImagePreview, setEditingCoverImagePreview] = useState('');
+  const [foodImageFile, setFoodImageFile] = useState(null);
+  const [foodImagePreview, setFoodImagePreview] = useState('');
 
   // Artisan & Workshop Verification State (Admin Approvals)
   const [artisanApps, setArtisanApps] = useState([]);
   const [artisanFilter, setArtisanFilter] = useState('all'); // 'all' | 'pending' | 'approved' | 'rejected'
   const [selectedAppModal, setSelectedAppModal] = useState(null);
+
+  // Tourist Support & Grievance Tickets State
+  const [supportTickets, setSupportTickets] = useState([]);
+  const [ticketFilter, setTicketFilter] = useState('all'); // 'all' | 'open' | 'in_review' | 'resolved'
+  const [ticketSearch, setTicketSearch] = useState('');
+  const [selectedTicketModal, setSelectedTicketModal] = useState(null);
+  const [ticketStatusUpdating, setTicketStatusUpdating] = useState(false);
 
   // Food / Culinary Heritage State (Admin-Only)
   const [foodList, setFoodList] = useState([]);
@@ -145,12 +176,13 @@ export default function AdminPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [statsRes, placesRes, feedRes, foodRes, appsRes] = await Promise.all([
+      const [statsRes, placesRes, feedRes, foodRes, appsRes, ticketsRes] = await Promise.all([
         adminService.getStats().catch(() => ({ success: false })),
         placeService.getAll().catch(() => ({ success: false })),
         postService.getFeed().catch(() => ({ success: false })),
         foodService.getAll().catch(() => ({ success: false })),
         artisanVerificationService.getAll().catch(() => ({ success: false })),
+        supportService.getAll().catch(() => ({ success: false })),
       ]);
 
       if (statsRes.success) setStats(statsRes.stats);
@@ -158,10 +190,58 @@ export default function AdminPage() {
       if (feedRes.success) setRecentPosts(feedRes.posts);
       if (foodRes.success) setFoodList(foodRes.foods || []);
       if (appsRes.success) setArtisanApps(appsRes.applications || []);
+      if (ticketsRes.success) setSupportTickets(ticketsRes.tickets || []);
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUpdateTicketStatus = async (ticketId, newStatus) => {
+    setTicketStatusUpdating(true);
+    try {
+      const res = await supportService.updateStatus(ticketId, newStatus);
+      if (res.success) {
+        setSupportTickets((prev) =>
+          prev.map((t) =>
+            t.id === ticketId || t.ticketNumber === ticketId
+              ? {
+                  ...t,
+                  status: newStatus,
+                  statusHi: newStatus === 'RESOLVED' ? 'निस्तारित' : newStatus === 'IN_REVIEW' ? 'समीक्षाधीन' : 'खुला',
+                }
+              : t
+          )
+        );
+        if (selectedTicketModal && (selectedTicketModal.id === ticketId || selectedTicketModal.ticketNumber === ticketId)) {
+          setSelectedTicketModal((prev) => ({ ...prev, status: newStatus }));
+        }
+        setFeedback({
+          type: 'success',
+          message: `Ticket status updated to "${newStatus}" successfully!`,
+        });
+      }
+    } catch (err) {
+      setFeedback({ type: 'error', message: 'Failed to update ticket status.' });
+    } finally {
+      setTicketStatusUpdating(false);
+    }
+  };
+
+  const handleDeleteTicket = async (ticketId, ticketNumber) => {
+    if (!window.confirm(`Are you sure you want to delete support ticket ${ticketNumber || ticketId}?`)) return;
+    try {
+      const res = await supportService.delete(ticketId);
+      if (res.success) {
+        setSupportTickets((prev) => prev.filter((t) => t.id !== ticketId && t.ticketNumber !== ticketId));
+        if (selectedTicketModal && (selectedTicketModal.id === ticketId || selectedTicketModal.ticketNumber === ticketId)) {
+          setSelectedTicketModal(null);
+        }
+        setFeedback({ type: 'success', message: `Ticket ${ticketNumber || ticketId} removed.` });
+      }
+    } catch (err) {
+      setFeedback({ type: 'error', message: 'Failed to delete ticket.' });
     }
   };
 
@@ -216,14 +296,23 @@ export default function AdminPage() {
 
     try {
       const selectedPlace = places.find((p) => String(p.id) === String(foodFormData.placeId));
-      const payload = {
-        ...foodFormData,
-        monumentName: selectedPlace ? selectedPlace.name : 'Heritage Monument',
-      };
+      const payload = new FormData();
+      Object.keys(foodFormData).forEach((key) => {
+        if (foodFormData[key] !== undefined && foodFormData[key] !== null) {
+          payload.append(key, foodFormData[key]);
+        }
+      });
+      payload.append('monumentName', selectedPlace ? selectedPlace.name : 'Heritage Monument');
+      if (foodImageFile) {
+        payload.append('image', foodImageFile);
+      }
+
       const res = await foodService.create(payload);
       if (res.success) {
         setFeedback({ type: 'success', message: `Added famous regional delicacy "${foodFormData.name}" successfully!` });
         setShowAddFoodModal(false);
+        setFoodImageFile(null);
+        setFoodImagePreview('');
         setFoodFormData({
           placeId: '',
           name: '',
@@ -239,6 +328,11 @@ export default function AdminPage() {
           priceRange: '₹50 - ₹150',
           imageUrl: '',
         });
+        // Sync with local offline cache
+        if (res.food) {
+          const currentCached = getLocalCachedData('foods', []);
+          setLocalCachedData('foods', [res.food, ...currentCached]);
+        }
         loadData();
       } else {
         setFeedback({ type: 'error', message: res.message || 'Failed to add food item.' });
@@ -267,6 +361,18 @@ export default function AdminPage() {
     if (isAdmin) {
       loadData();
     }
+
+    const handleTicketCreated = () => {
+      supportService.getAll().then((res) => {
+        if (res.success && res.tickets) {
+          setSupportTickets(res.tickets);
+        }
+      });
+    };
+    window.addEventListener('sanskriti_ticket_created', handleTicketCreated);
+    return () => {
+      window.removeEventListener('sanskriti_ticket_created', handleTicketCreated);
+    };
   }, [isAdmin]);
 
   const handleChange = (e) => {
@@ -285,15 +391,24 @@ export default function AdminPage() {
           if (formData.mediaLinks && formData.mediaLinks.length > 0) {
             payload.append('mediaLinks', JSON.stringify(formData.mediaLinks));
           }
-        } else {
+        } else if (key !== 'coverImage') {
           payload.append(key, formData[key]);
         }
       });
+
+      // Attach file or URL
+      if (coverImageFile) {
+        payload.append('coverImage', coverImageFile);
+      } else if (formData.coverImage) {
+        payload.append('coverImage', formData.coverImage);
+      }
 
       const res = await adminService.createPlace(payload);
       if (res.success) {
         setFeedback({ type: 'success', message: 'Heritage site added successfully!' });
         setShowAddForm(false);
+        setCoverImageFile(null);
+        setCoverImagePreview('');
         setFormData({
           name: '',
           category: 'monument',
@@ -306,6 +421,11 @@ export default function AdminPage() {
           youtubeVideoId: '',
           mediaLinks: [],
         });
+        // Sync with local offline cache
+        if (res.place) {
+          const currentCached = getLocalCachedData('places', []);
+          setLocalCachedData('places', [res.place, ...currentCached]);
+        }
         loadData();
       } else {
         setFeedback({ type: 'error', message: res.message || 'Failed to add place.' });
@@ -321,6 +441,8 @@ export default function AdminPage() {
   };
 
   const openEditModal = (place) => {
+    setEditingCoverImageFile(null);
+    setEditingCoverImagePreview(place.coverImage || '');
     setEditingPlace({
       id: place.id,
       name: place.name,
@@ -347,15 +469,23 @@ export default function AdminPage() {
       Object.keys(editingPlace).forEach((key) => {
         if (key === 'mediaLinks') {
           payload.append('mediaLinks', JSON.stringify(editingPlace.mediaLinks || []));
-        } else if (key !== 'id') {
+        } else if (key !== 'id' && key !== 'coverImage') {
           payload.append(key, editingPlace[key]);
         }
       });
+
+      if (editingCoverImageFile) {
+        payload.append('coverImage', editingCoverImageFile);
+      } else if (editingPlace.coverImage) {
+        payload.append('coverImage', editingPlace.coverImage);
+      }
 
       const res = await adminService.updatePlace(editingPlace.id, payload);
       if (res.success) {
         setFeedback({ type: 'success', message: `Updated "${editingPlace.name}" and cultural media links successfully!` });
         setEditingPlace(null);
+        setEditingCoverImageFile(null);
+        setEditingCoverImagePreview('');
         loadData();
       } else {
         setFeedback({ type: 'error', message: res.message || 'Failed to update place.' });
@@ -614,7 +744,7 @@ export default function AdminPage() {
 
         {/* Stats Row */}
         {stats && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             <div className="bg-white p-5 rounded-3xl border border-stone-200 shadow-xs flex items-center gap-3.5">
               <div className="w-11 h-11 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
                 <Landmark className="w-5 h-5" />
@@ -666,6 +796,29 @@ export default function AdminPage() {
                   {artisanApps.filter((a) => a.status === 'PENDING').length > 0 && (
                     <span className="text-[10px] font-extrabold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
                       {artisanApps.filter((a) => a.status === 'PENDING').length} Pending
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div
+              onClick={() => {
+                const el = document.getElementById('support-tickets-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="bg-white p-5 rounded-3xl border border-stone-200 shadow-xs flex items-center gap-3.5 hover:border-amber-400 cursor-pointer transition-colors"
+            >
+              <div className="w-11 h-11 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center flex-shrink-0">
+                <HelpCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold text-stone-500 uppercase">Support Tickets</p>
+                <div className="flex items-center gap-1.5">
+                  <h3 className="font-serif text-2xl font-bold text-stone-900">{supportTickets.length}</h3>
+                  {supportTickets.filter((t) => t.status === 'OPEN').length > 0 && (
+                    <span className="text-[10px] font-extrabold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
+                      {supportTickets.filter((t) => t.status === 'OPEN').length} New
                     </span>
                   )}
                 </div>
@@ -796,18 +949,67 @@ export default function AdminPage() {
 
               {/* Media & Image */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 uppercase mb-1">
-                    Cover Image URL
+                <div className="space-y-2">
+                  <label className="block text-xs font-semibold text-stone-700 uppercase">
+                    Cover Photo (File Upload / URL) *
                   </label>
-                  <input
-                    type="url"
-                    name="coverImage"
-                    value={formData.coverImage}
-                    onChange={handleChange}
-                    placeholder="https://images.unsplash.com/..."
-                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm"
-                  />
+
+                  {/* Dual Upload / URL Selector */}
+                  <label className="flex items-center justify-center gap-2 px-4 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-xl cursor-pointer border border-dashed border-stone-300 transition-colors">
+                    <Upload className="w-4 h-4 text-heritage-600" />
+                    <span>{coverImageFile ? coverImageFile.name : 'Upload Photo from Device (Offline Ready)'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setCoverImageFile(file);
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setCoverImagePreview(reader.result);
+                            setFormData((prev) => ({ ...prev, coverImage: reader.result }));
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+
+                  {coverImagePreview && (
+                    <div className="relative w-full h-28 rounded-xl overflow-hidden border border-stone-200 bg-stone-50">
+                      <img src={coverImagePreview} alt="Preview" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCoverImageFile(null);
+                          setCoverImagePreview('');
+                          setFormData((prev) => ({ ...prev, coverImage: '' }));
+                        }}
+                        className="absolute top-2 right-2 p-1 bg-black/60 text-white rounded-full hover:bg-black/80"
+                        title="Remove image"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-stone-400 font-bold uppercase whitespace-nowrap">or web url</span>
+                    <input
+                      type="url"
+                      name="coverImage"
+                      value={formData.coverImage?.startsWith('data:') ? '' : formData.coverImage}
+                      onChange={(e) => {
+                        setCoverImageFile(null);
+                        setCoverImagePreview(e.target.value);
+                        handleChange(e);
+                      }}
+                      placeholder="https://images.unsplash.com/..."
+                      className="w-full px-3 py-1.5 bg-stone-50 border border-stone-200 rounded-xl text-xs"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -822,6 +1024,9 @@ export default function AdminPage() {
                     placeholder="e.g. i9E_Bl4E6nE"
                     className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm"
                   />
+                  <p className="text-[10px] text-stone-400 mt-1">
+                    Used for virtual tour video link on the monument chronicle page.
+                  </p>
                 </div>
               </div>
 
@@ -975,16 +1180,57 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 uppercase mb-1">
-                    Cover Image URL
+                <div className="space-y-2">
+                  <label className="block text-xs font-semibold text-stone-700 uppercase">
+                    Cover Photo (File Upload / URL)
                   </label>
-                  <input
-                    type="url"
-                    value={editingPlace.coverImage}
-                    onChange={(e) => setEditingPlace({ ...editingPlace, coverImage: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm"
-                  />
+
+                  <label className="flex items-center justify-center gap-2 px-4 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-xl cursor-pointer border border-dashed border-stone-300 transition-colors">
+                    <Upload className="w-4 h-4 text-heritage-600" />
+                    <span>{editingCoverImageFile ? editingCoverImageFile.name : 'Change Photo from Device'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setEditingCoverImageFile(file);
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setEditingCoverImagePreview(reader.result);
+                            setEditingPlace((prev) => ({ ...prev, coverImage: reader.result }));
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+
+                  {(editingCoverImagePreview || editingPlace.coverImage) && (
+                    <div className="relative w-full h-28 rounded-xl overflow-hidden border border-stone-200 bg-stone-50">
+                      <img
+                        src={editingCoverImagePreview || editingPlace.coverImage}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-stone-400 font-bold uppercase whitespace-nowrap">or web url</span>
+                    <input
+                      type="url"
+                      value={editingPlace.coverImage?.startsWith('data:') ? '' : editingPlace.coverImage}
+                      onChange={(e) => {
+                        setEditingCoverImageFile(null);
+                        setEditingCoverImagePreview(e.target.value);
+                        setEditingPlace({ ...editingPlace, coverImage: e.target.value });
+                      }}
+                      placeholder="https://images.unsplash.com/..."
+                      className="w-full px-3 py-1.5 bg-stone-50 border border-stone-200 rounded-xl text-xs"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -1412,6 +1658,337 @@ export default function AdminPage() {
           </div>
         </div>
 
+        {/* Tourist Support & Grievance Tickets (पर्यटक सहायता एवं शिकायत निवारण) */}
+        <div id="support-tickets-section" className="bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden scroll-mt-6">
+          <div className="p-6 border-b border-stone-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center flex-shrink-0 shadow-xs">
+                <HelpCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-serif text-lg font-bold text-stone-900">
+                    Tourist Support & Grievance Tickets (पर्यटक सहायता एवं शिकायत निवारण)
+                  </h3>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-100 text-amber-900 border border-amber-200">
+                    Real-Time Support
+                  </span>
+                </div>
+                <p className="text-xs text-stone-500">
+                  Review reported app bugs, handicraft order issues, missing monument requests, and general feedback submitted by tourists.
+                </p>
+              </div>
+            </div>
+
+            {/* Filter Pills & Search */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setTicketFilter('all')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  ticketFilter === 'all'
+                    ? 'bg-stone-900 text-white'
+                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                }`}
+              >
+                All ({supportTickets.length})
+              </button>
+              <button
+                onClick={() => setTicketFilter('open')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  ticketFilter === 'open'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                <span>Open ({supportTickets.filter((t) => t.status === 'OPEN').length})</span>
+              </button>
+              <button
+                onClick={() => setTicketFilter('in_review')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  ticketFilter === 'in_review'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-blue-50 text-blue-800 hover:bg-blue-100'
+                }`}
+              >
+                In Review ({supportTickets.filter((t) => t.status === 'IN_REVIEW').length})
+              </button>
+              <button
+                onClick={() => setTicketFilter('resolved')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  ticketFilter === 'resolved'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                }`}
+              >
+                Resolved ({supportTickets.filter((t) => t.status === 'RESOLVED').length})
+              </button>
+
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search tickets..."
+                  value={ticketSearch}
+                  onChange={(e) => setTicketSearch(e.target.value)}
+                  className="pl-8 pr-3 py-1.5 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-800 placeholder-stone-400 focus:outline-none focus:bg-white focus:ring-1 focus:ring-amber-500 w-36 sm:w-48"
+                />
+                <Search className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-2" />
+              </div>
+
+              <button
+                onClick={async () => {
+                  const res = await supportService.getAll();
+                  if (res.success) setSupportTickets(res.tickets || []);
+                }}
+                className="p-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl transition-colors cursor-pointer"
+                title="Refresh Tickets"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-stone-50 text-stone-600 uppercase font-bold tracking-wider border-b border-stone-200">
+                <tr>
+                  <th className="p-4">Ticket Number</th>
+                  <th className="p-4">Category & Priority</th>
+                  <th className="p-4">Tourist Contact</th>
+                  <th className="p-4">Subject & Issue Details</th>
+                  <th className="p-4">Date</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100 font-medium text-stone-700">
+                {supportTickets
+                  .filter((t) => {
+                    if (ticketFilter === 'open') return t.status === 'OPEN';
+                    if (ticketFilter === 'in_review') return t.status === 'IN_REVIEW';
+                    if (ticketFilter === 'resolved') return t.status === 'RESOLVED';
+                    return true;
+                  })
+                  .filter((t) => {
+                    if (!ticketSearch.trim()) return true;
+                    const q = ticketSearch.toLowerCase();
+                    return (
+                      (t.ticketNumber || '').toLowerCase().includes(q) ||
+                      (t.subject || '').toLowerCase().includes(q) ||
+                      (t.category || '').toLowerCase().includes(q) ||
+                      (t.description || '').toLowerCase().includes(q) ||
+                      (t.contactEmail || '').toLowerCase().includes(q) ||
+                      (t.contactPhone || '').toLowerCase().includes(q) ||
+                      (t.referenceId || '').toLowerCase().includes(q)
+                    );
+                  })
+                  .map((ticket) => (
+                    <tr key={ticket.id || ticket.ticketNumber} className="hover:bg-amber-50/30 transition-colors">
+                      <td className="p-4 font-mono font-bold text-amber-900">
+                        <span className="bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 block w-fit">
+                          {ticket.ticketNumber || ticket.id}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <div className="font-semibold text-stone-900">{ticket.category}</div>
+                        <span
+                          className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                            ticket.priority === 'urgent'
+                              ? 'bg-red-100 text-red-800 border border-red-200'
+                              : ticket.priority === 'high'
+                              ? 'bg-orange-100 text-orange-800 border border-orange-200'
+                              : 'bg-stone-100 text-stone-600 border border-stone-200'
+                          }`}
+                        >
+                          {ticket.priority || 'normal'}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-1.5 text-stone-800 font-medium">
+                          <Mail className="w-3.5 h-3.5 text-stone-400" />
+                          <span>{ticket.contactEmail || 'N/A'}</span>
+                        </div>
+                        {ticket.contactPhone && (
+                          <div className="flex items-center gap-1.5 text-stone-500 text-[11px] mt-0.5">
+                            <Phone className="w-3 h-3 text-stone-400" />
+                            <span>{ticket.contactPhone}</span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-4 max-w-sm">
+                        <div className="font-bold text-stone-900 line-clamp-1">{ticket.subject}</div>
+                        <div className="text-[11px] text-stone-500 line-clamp-2 mt-0.5">{ticket.description}</div>
+                        {ticket.referenceId && (
+                          <div className="mt-1 text-[10px] font-mono text-amber-700 bg-amber-50/80 px-1.5 py-0.5 rounded w-fit border border-amber-200/50">
+                            Ref: {ticket.referenceId}
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-4 text-stone-500 whitespace-nowrap">
+                        {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString() : 'Recent'}
+                      </td>
+                      <td className="p-4">
+                        {ticket.status === 'RESOLVED' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Resolved (निस्तारित)</span>
+                          </span>
+                        ) : ticket.status === 'IN_REVIEW' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-900 border border-blue-300">
+                            <Clock className="w-3.5 h-3.5 text-blue-600" />
+                            <span>In Review (समीक्षाधीन)</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                            <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                            <span>Open (खुला)</span>
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => setSelectedTicketModal(ticket)}
+                            className="px-2.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                            title="View Full Details"
+                          >
+                            Details
+                          </button>
+                          {ticket.status !== 'RESOLVED' && (
+                            <button
+                              onClick={() => handleUpdateTicketStatus(ticket.id || ticket.ticketNumber, 'RESOLVED')}
+                              disabled={ticketStatusUpdating}
+                              className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all active:scale-95 flex items-center gap-1 cursor-pointer"
+                              title="Mark as Resolved"
+                            >
+                              <Check className="w-3 h-3" />
+                              <span className="hidden sm:inline">Resolve</span>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteTicket(ticket.id || ticket.ticketNumber, ticket.ticketNumber)}
+                            className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                            title="Delete Ticket"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                {supportTickets.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-stone-400">
+                      No support tickets registered yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Modal: View Support Ticket Details */}
+        {selectedTicketModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn overflow-y-auto">
+            <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 space-y-5 shadow-2xl border border-stone-200 my-6">
+              <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-amber-100 text-amber-800">
+                    <HelpCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-serif text-lg font-bold text-stone-900">
+                      Support Ticket Dossier
+                    </h3>
+                    <p className="text-xs text-stone-500 font-mono">
+                      {selectedTicketModal.ticketNumber || selectedTicketModal.id}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTicketModal(null)}
+                  className="p-1.5 rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4 text-xs">
+                <div className="grid grid-cols-2 gap-3 p-3 bg-stone-50 rounded-2xl border border-stone-200">
+                  <div>
+                    <span className="text-stone-500 block text-[10px] uppercase font-bold">Category</span>
+                    <span className="font-bold text-stone-900">{selectedTicketModal.category}</span>
+                  </div>
+                  <div>
+                    <span className="text-stone-500 block text-[10px] uppercase font-bold">Priority</span>
+                    <span className="font-bold uppercase text-amber-800">{selectedTicketModal.priority || 'Normal'}</span>
+                  </div>
+                  <div>
+                    <span className="text-stone-500 block text-[10px] uppercase font-bold">Contact Email</span>
+                    <span className="font-semibold text-stone-800">{selectedTicketModal.contactEmail || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-stone-500 block text-[10px] uppercase font-bold">Contact Phone</span>
+                    <span className="font-semibold text-stone-800">{selectedTicketModal.contactPhone || 'N/A'}</span>
+                  </div>
+                  {selectedTicketModal.referenceId && (
+                    <div className="col-span-2">
+                      <span className="text-stone-500 block text-[10px] uppercase font-bold">Reference Identifier</span>
+                      <span className="font-mono text-amber-900 font-semibold">{selectedTicketModal.referenceId}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-stone-500 block text-[10px] uppercase font-bold">Subject</span>
+                  <div className="p-3 bg-white rounded-xl border border-stone-200 font-bold text-stone-900">
+                    {selectedTicketModal.subject}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-stone-500 block text-[10px] uppercase font-bold">Issue Description</span>
+                  <div className="p-4 bg-stone-50 rounded-xl border border-stone-200 text-stone-700 leading-relaxed whitespace-pre-wrap">
+                    {selectedTicketModal.description}
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-stone-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-stone-500 font-bold">Change Status:</span>
+                    <select
+                      value={selectedTicketModal.status || 'OPEN'}
+                      onChange={(e) => handleUpdateTicketStatus(selectedTicketModal.id || selectedTicketModal.ticketNumber, e.target.value)}
+                      className="px-3 py-1.5 rounded-xl border border-stone-300 font-bold text-stone-800 bg-white"
+                    >
+                      <option value="OPEN">🟡 Open (खुला)</option>
+                      <option value="IN_REVIEW">🔵 In Review (समीक्षाधीन)</option>
+                      <option value="RESOLVED">🟢 Resolved (निस्तारित)</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleUpdateTicketStatus(selectedTicketModal.id || selectedTicketModal.ticketNumber, 'RESOLVED')}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-xs transition-all cursor-pointer"
+                    >
+                      Mark Resolved
+                    </button>
+                    <button
+                      onClick={() => setSelectedTicketModal(null)}
+                      className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl font-medium transition-all cursor-pointer"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Modal: Add Famous Regional Food (Admin Only) */}
         {showAddFoodModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn overflow-y-auto">
@@ -1578,17 +2155,65 @@ export default function AdminPage() {
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <label className="text-xs font-bold text-stone-700">
-                    Dish Photo Image URL
+                    Dish Photo (File Upload / URL)
                   </label>
-                  <input
-                    type="url"
-                    placeholder="https://images.unsplash.com/photo-..."
-                    value={foodFormData.imageUrl}
-                    onChange={(e) => setFoodFormData({ ...foodFormData, imageUrl: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 text-xs text-stone-900 focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  />
+
+                  <label className="flex items-center justify-center gap-2 px-4 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-xl cursor-pointer border border-dashed border-stone-300 transition-colors">
+                    <Upload className="w-4 h-4 text-amber-700" />
+                    <span>{foodImageFile ? foodImageFile.name : 'Upload Dish Photo from Device (Offline Ready)'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setFoodImageFile(file);
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setFoodImagePreview(reader.result);
+                            setFoodFormData((prev) => ({ ...prev, imageUrl: reader.result }));
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+
+                  {foodImagePreview && (
+                    <div className="relative w-full h-28 rounded-xl overflow-hidden border border-stone-200 bg-stone-50">
+                      <img src={foodImagePreview} alt="Preview" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFoodImageFile(null);
+                          setFoodImagePreview('');
+                          setFoodFormData((prev) => ({ ...prev, imageUrl: '' }));
+                        }}
+                        className="absolute top-2 right-2 p-1 bg-black/60 text-white rounded-full hover:bg-black/80"
+                        title="Remove image"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-stone-400 font-bold uppercase whitespace-nowrap">or web url</span>
+                    <input
+                      type="url"
+                      placeholder="https://images.unsplash.com/photo-..."
+                      value={foodFormData.imageUrl?.startsWith('data:') ? '' : foodFormData.imageUrl}
+                      onChange={(e) => {
+                        setFoodImageFile(null);
+                        setFoodImagePreview(e.target.value);
+                        setFoodFormData({ ...foodFormData, imageUrl: e.target.value });
+                      }}
+                      className="w-full px-3 py-1.5 rounded-xl border border-stone-300 text-xs text-stone-900 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                    />
+                  </div>
                 </div>
 
                 <div className="pt-3 border-t border-stone-100 flex items-center justify-end gap-3">

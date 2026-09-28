@@ -3,6 +3,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import ReportIssueModal from '../components/ReportIssueModal';
+import InstagramPostCard from '../components/InstagramPostCard';
+import PostModal from '../components/PostModal';
+import { postService } from '../services/api';
 import {
   User,
   Mail,
@@ -30,6 +33,7 @@ import {
   ChevronDown,
   ChevronUp,
   ShieldAlert,
+  RefreshCw,
 } from 'lucide-react';
 
 const CULTURAL_AVATARS = [
@@ -72,9 +76,17 @@ export default function ProfilePage() {
   const [searchParams] = useSearchParams();
 
   const [activeTab, setActiveTab] = useState(() => {
-    return searchParams.get('tab') === 'preferences' ? 'preferences' : 'profile';
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'preferences') return 'preferences';
+    if (tabParam === 'posts' || tabParam === 'my-posts') return 'posts';
+    return 'profile';
   });
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // User posts state
+  const [myPosts, setMyPosts] = useState([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [postModalOpen, setPostModalOpen] = useState(false);
 
   // Support & Grievance states
   const [reportModalOpen, setReportModalOpen] = useState(() => {
@@ -95,12 +107,66 @@ export default function ProfilePage() {
     setShowMyTickets(true);
   };
 
+  const fetchUserPosts = async () => {
+    setLoadingPosts(true);
+    try {
+      const res = await postService.getMyPosts();
+      if (res.success && res.posts) {
+        setMyPosts(res.posts);
+      } else {
+        const feedRes = await postService.getFeed();
+        const myIds = JSON.parse(localStorage.getItem('sanskriti_my_post_ids') || '[]');
+        if (feedRes.success && feedRes.posts) {
+          const mine = feedRes.posts.filter(
+            (p) =>
+              (user && (p.userId === user.id || p.user?.id === user.id || (user.email && p.user?.email === user.email))) ||
+              myIds.includes(p.id) ||
+              myIds.includes(Number(p.id))
+          );
+          setMyPosts(mine);
+        }
+      }
+    } catch (err) {
+      console.warn('fetchUserPosts notice:', err);
+      try {
+        const feedRes = await postService.getFeed();
+        const myIds = JSON.parse(localStorage.getItem('sanskriti_my_post_ids') || '[]');
+        if (feedRes.success && feedRes.posts) {
+          const mine = feedRes.posts.filter(
+            (p) =>
+              (user && (p.userId === user.id || p.user?.id === user.id)) ||
+              myIds.includes(p.id) ||
+              myIds.includes(Number(p.id))
+          );
+          setMyPosts(mine);
+        }
+      } catch {}
+    } finally {
+      setLoadingPosts(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUserPosts();
+    const handlePostsChanged = () => {
+      fetchUserPosts();
+    };
+    window.addEventListener('sanskriti_my_posts_changed', handlePostsChanged);
+    window.addEventListener('sanskriti_post_created', handlePostsChanged);
+    return () => {
+      window.removeEventListener('sanskriti_my_posts_changed', handlePostsChanged);
+      window.removeEventListener('sanskriti_post_created', handlePostsChanged);
+    };
+  }, [user]);
+
   useEffect(() => {
     const tabParam = searchParams.get('tab');
     if (tabParam === 'preferences') {
       setActiveTab('preferences');
     } else if (tabParam === 'profile') {
       setActiveTab('profile');
+    } else if (tabParam === 'posts' || tabParam === 'my-posts') {
+      setActiveTab('posts');
     }
     if (searchParams.get('report') === 'true') {
       setActiveTab('preferences');
@@ -256,11 +322,26 @@ export default function ProfilePage() {
           </div>
 
           {/* Real-time Activity Stats Ribbon */}
-          <div className="grid grid-cols-3 gap-3 pt-6 mt-6 border-t border-white/10 text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-6 mt-6 border-t border-white/10 text-center">
             <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10">
               <div className="font-serif text-xl sm:text-2xl font-bold text-amber-400">14</div>
               <div className="text-[10px] text-stone-400 uppercase font-semibold">
                 {lang === 'hi' ? 'स्मारक उपलब्ध' : 'Heritage Sites'}
+              </div>
+            </div>
+
+            <div
+              onClick={() => setActiveTab('posts')}
+              className={`p-2.5 rounded-2xl bg-white/5 border transition-all cursor-pointer ${
+                activeTab === 'posts' ? 'border-amber-400 bg-white/10' : 'border-white/10 hover:border-amber-400/40'
+              }`}
+            >
+              <div className="font-serif text-xl sm:text-2xl font-bold text-amber-400 flex items-center justify-center gap-1">
+                <span>{myPosts.length}</span>
+                <Camera className="w-3.5 h-3.5 text-amber-400" />
+              </div>
+              <div className="text-[10px] text-stone-400 uppercase font-semibold">
+                {lang === 'hi' ? 'मेरी पोस्टें' : 'My Posts'}
               </div>
             </div>
 
@@ -292,30 +373,47 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Tab Navigation: Edit Profile vs Preferences */}
-        <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-stone-200/70 max-w-md mx-auto">
+        {/* Tab Navigation: Edit Profile vs My Posts vs Preferences */}
+        <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-stone-200/70 max-w-xl mx-auto">
           <button
             onClick={() => setActiveTab('profile')}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
               activeTab === 'profile'
                 ? 'bg-white text-stone-900 shadow-sm'
                 : 'text-stone-600 hover:text-stone-900'
             }`}
           >
             <User className="w-4 h-4 text-heritage-600" />
-            <span>{lang === 'hi' ? 'व्यक्तिगत प्रोफ़ाइल' : 'Personal Profile'}</span>
+            <span className="hidden sm:inline">{lang === 'hi' ? 'व्यक्तिगत प्रोफ़ाइल' : 'Personal Profile'}</span>
+            <span className="sm:hidden">{lang === 'hi' ? 'प्रोफ़ाइल' : 'Profile'}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('posts')}
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+              activeTab === 'posts'
+                ? 'bg-white text-stone-900 shadow-sm'
+                : 'text-stone-600 hover:text-stone-900'
+            }`}
+          >
+            <Camera className="w-4 h-4 text-rose-500" />
+            <span>{lang === 'hi' ? 'मेरी पोस्टें' : 'My Posts'}</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-rose-100 text-rose-700 text-[10px] font-extrabold">
+              {myPosts.length}
+            </span>
           </button>
 
           <button
             onClick={() => setActiveTab('preferences')}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
               activeTab === 'preferences'
                 ? 'bg-white text-stone-900 shadow-sm'
                 : 'text-stone-600 hover:text-stone-900'
             }`}
           >
             <Settings className="w-4 h-4 text-heritage-600" />
-            <span>{lang === 'hi' ? 'भाषा एवं सेटिंग्स' : 'Language & Settings'}</span>
+            <span className="hidden sm:inline">{lang === 'hi' ? 'भाषा एवं सेटिंग्स' : 'Language & Settings'}</span>
+            <span className="sm:hidden">{lang === 'hi' ? 'सेटिंग्स' : 'Settings'}</span>
           </button>
         </div>
 
@@ -811,7 +909,104 @@ export default function ProfilePage() {
             </div>
           </div>
         )}
+
+        {/* TAB 3: MY POSTS (📸 मेरी पोस्टें एवं समीक्षाएं) */}
+        {activeTab === 'posts' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-3xl p-6 sm:p-7 border border-stone-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-serif text-xl font-bold text-stone-900">
+                    {lang === 'hi' ? 'मेरी धरोहर पोस्टें एवं समीक्षाएं' : 'My Shared Posts & Reviews'}
+                  </h2>
+                  <span className="px-2.5 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold">
+                    {myPosts.length} {lang === 'hi' ? 'पोस्ट' : myPosts.length === 1 ? 'Post' : 'Posts'}
+                  </span>
+                </div>
+                <p className="text-xs text-stone-500 mt-1">
+                  {lang === 'hi'
+                    ? 'यहाँ आपकी सभी साझा की गई तस्वीरें व समीक्षाएं हैं। आप 3-डॉट्स (...) मेनू से उन्हें संशोधित या हटा सकते हैं।'
+                    : 'Manage your visitor reviews, ratings and travel captures. Click the 3-dots (...) menu on any post to edit caption/rating or delete.'}
+                </p>
+              </div>
+
+              <button
+                onClick={() => setPostModalOpen(true)}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-rose-500 via-rose-600 to-amber-500 hover:opacity-95 text-white text-xs font-bold shadow-md shadow-rose-500/25 transition-all active:scale-95"
+              >
+                <Camera className="w-4 h-4" />
+                <span>{lang === 'hi' ? 'नई पोस्ट साझा करें' : 'Create New Post'}</span>
+              </button>
+            </div>
+
+            {loadingPosts ? (
+              <div className="p-12 text-center bg-white rounded-3xl border border-stone-200">
+                <RefreshCw className="w-8 h-8 text-rose-500 animate-spin mx-auto mb-2" />
+                <p className="text-xs text-stone-500 font-medium">
+                  {lang === 'hi' ? 'आपकी पोस्टें लोड हो रही हैं...' : 'Loading your posts from database...'}
+                </p>
+              </div>
+            ) : myPosts.length === 0 ? (
+              <div className="p-12 sm:p-16 text-center bg-white rounded-3xl border border-dashed border-stone-300 space-y-4 shadow-sm">
+                <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center mx-auto border border-rose-200">
+                  <Camera className="w-8 h-8" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-serif text-lg font-bold text-stone-800">
+                    {lang === 'hi' ? 'आपने अभी तक कोई पोस्ट साझा नहीं की है' : 'No Posts Shared Yet'}
+                  </h3>
+                  <p className="text-xs text-stone-500 max-w-md mx-auto">
+                    {lang === 'hi'
+                      ? 'ताजमहल, वाराणसी, हम्पी या अन्य किसी भी धरोहर स्थल की अपनी पसंदीदा तस्वीर व अनुभव साझा करें!'
+                      : 'Capture and share your memorable visit photos, ratings, and cultural reviews for Taj Mahal, Varanasi, Hampi, and beyond!'}
+                  </p>
+                </div>
+                <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <button
+                    onClick={() => setPostModalOpen(true)}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-rose-500 to-amber-500 hover:opacity-95 text-white rounded-2xl text-xs font-bold shadow-md shadow-rose-500/25 transition-all"
+                  >
+                    <Camera className="w-4 h-4" />
+                    <span>{lang === 'hi' ? 'पहला अनुभव पोस्ट करें' : 'Post Your First Review'}</span>
+                  </button>
+                  <button
+                    onClick={() => navigate('/feed')}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-2xl text-xs font-bold transition-all"
+                  >
+                    <span>{lang === 'hi' ? 'सामुदायिक फ़ीड देखें' : 'Explore Community Feed'}</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6 max-w-xl mx-auto">
+                {myPosts.map((post) => (
+                  <InstagramPostCard
+                    key={post.id}
+                    post={post}
+                    onPostDelete={(deletedId) => {
+                      setMyPosts((prev) => prev.filter((p) => p.id !== deletedId));
+                    }}
+                    onPostUpdate={(updatedPost) => {
+                      setMyPosts((prev) =>
+                        prev.map((p) => (p.id === updatedPost.id ? { ...p, ...updatedPost } : p))
+                      );
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Post Modal for Creating New Post from Profile */}
+      <PostModal
+        isOpen={postModalOpen}
+        onClose={() => setPostModalOpen(false)}
+        onPostCreated={() => {
+          fetchUserPosts();
+        }}
+      />
 
       {/* Report Issue Modal */}
       <ReportIssueModal

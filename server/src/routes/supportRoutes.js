@@ -1,5 +1,10 @@
 import { Router } from 'express';
-import { createSupportTicket, getSupportTickets } from '../controllers/supportController.js';
+import {
+  createSupportTicket,
+  getSupportTickets,
+  updateTicketStatus,
+  deleteSupportTicket,
+} from '../controllers/supportController.js';
 import { upload } from '../middlewares/uploadMiddleware.js';
 
 const router = Router();
@@ -9,5 +14,12 @@ router.post('/report', upload.single('attachment'), createSupportTicket);
 
 // List tickets
 router.get('/tickets', getSupportTickets);
+
+// Update ticket status (Admin)
+router.patch('/tickets/:id/status', updateTicketStatus);
+router.put('/tickets/:id/status', updateTicketStatus);
+
+// Delete ticket (Admin)
+router.delete('/tickets/:id', deleteSupportTicket);
 
 export default router;

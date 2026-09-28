@@ -1,6 +1,20 @@
 import axios from 'axios';
 import { FALLBACK_PLACES, FALLBACK_PRODUCTS, FALLBACK_FOODS } from '../data/fallbackData';
 
+export const getLocalCachedData = (key, fallback) => {
+  try {
+    const raw = localStorage.getItem(`sanskriti_cache_${key}`);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return fallback;
+};
+
+export const setLocalCachedData = (key, data) => {
+  try {
+    localStorage.setItem(`sanskriti_cache_${key}`, JSON.stringify(data));
+  } catch {}
+};
+
 export const getApiBaseUrl = () => {
   const custom = localStorage.getItem('sanskriti_custom_api_url') || localStorage.getItem('sih_custom_api_url');
   if (custom && custom.trim()) {
@@ -22,6 +36,7 @@ export const getApiBaseUrl = () => {
     window.Capacitor.isNativePlatform();
 
   if (isCapacitor) {
+    // Current host machine IP on local Wi-Fi / Hotspot
     return 'http://10.168.182.153:5000/api';
   }
 
@@ -39,7 +54,7 @@ export const getApiBaseUrl = () => {
 
 const api = axios.create({
   baseURL: getApiBaseUrl(),
-  timeout: 25000,
+  timeout: 3500, // Fast 3.5s timeout for local MySQL to prevent hanging
 });
 
 // Update baseURL dynamically if custom URL changed
@@ -47,12 +62,15 @@ export const updateApiBaseUrl = (newUrl) => {
   if (newUrl) {
     const clean = newUrl.trim().replace(/\/$/, '');
     const full = clean.endsWith('/api') ? clean : `${clean}/api`;
-    localStorage.setItem('sanskriti_custom_api_url', clean);
+    localStorage.setItem('sanskriti_custom_api_url', full);
     api.defaults.baseURL = full;
+    return full;
   } else {
     localStorage.removeItem('sanskriti_custom_api_url');
     localStorage.removeItem('sih_custom_api_url');
-    api.defaults.baseURL = getApiBaseUrl();
+    const defaultUrl = getApiBaseUrl();
+    api.defaults.baseURL = defaultUrl;
+    return defaultUrl;
   }
 };
 
@@ -61,10 +79,11 @@ export const checkServerHealth = async (customUrl = null) => {
     ? customUrl.trim().replace(/\/$/, '').replace(/\/api$/, '')
     : api.defaults.baseURL.replace(/\/api$/, '');
   try {
-    const res = await axios.get(`${base}/api/health`, { timeout: 4000 });
-    return { ok: true, data: res.data };
+    const start = Date.now();
+    const res = await axios.get(`${base}/api/health`, { timeout: 2500 });
+    return { ok: true, data: res.data, ping: Date.now() - start, url: `${base}/api` };
   } catch (err) {
-    return { ok: false, error: err.message || 'Cannot connect to backend server' };
+    return { ok: false, error: err.message || 'Cannot connect to backend server', url: `${base}/api` };
   }
 };
 
@@ -81,10 +100,14 @@ export const placeService = {
   getAll: async (params) => {
     try {
       const res = await api.get('/places', { params });
+      if (res.data?.places && res.data.places.length > 0 && !params?.search && (!params?.category || params.category === 'all')) {
+        setLocalCachedData('places', res.data.places);
+      }
       return res.data;
     } catch (err) {
       console.warn('Backend /places failed, using cached fallback heritage places:', err.message);
-      let list = [...FALLBACK_PLACES];
+      const cached = getLocalCachedData('places', FALLBACK_PLACES);
+      let list = [...cached];
       if (params?.category && params.category !== 'all') {
         list = list.filter((p) => p.category === params.category);
       }
@@ -154,12 +177,18 @@ export const postService = {
       return { success: true, count: 0, posts: [], isOfflineFallback: true };
     }
   },
+  getMyPosts: () => api.get('/posts/my-posts').then((res) => res.data),
   create: (formData) =>
     api
       .post('/posts', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       .then((res) => res.data),
+  update: (id, data) => api.patch(`/posts/${id}`, data).then((res) => res.data),
+  toggleLike: (id) => api.post(`/posts/${id}/like`).then((res) => res.data),
+  addComment: (id, data) => api.post(`/posts/${id}/comments`, data).then((res) => res.data),
+  toggleBookmark: (id) => api.post(`/posts/${id}/bookmark`).then((res) => res.data),
+  getBookmarkedPosts: () => api.get('/posts/bookmarks').then((res) => res.data),
   delete: (id) => api.delete(`/posts/${id}`).then((res) => res.data),
 };
 
@@ -252,6 +281,9 @@ export const productService = {
   getAll: async (params) => {
     try {
       const res = await api.get('/products', { params });
+      if (res.data?.products && res.data.products.length > 0 && !params?.search && (!params?.category || params.category === 'all')) {
+        setLocalCachedData('products', res.data.products);
+      }
       // Merge with locally added artisan products if any
       const localProducts = JSON.parse(localStorage.getItem('sanskriti_custom_products') || localStorage.getItem('sih_custom_products') || '[]');
       let combined = [...localProducts, ...(res.data.products || [])];
@@ -259,7 +291,8 @@ export const productService = {
     } catch (err) {
       console.warn('Backend /products failed, using fallback ODOP products:', err.message);
       const localProducts = JSON.parse(localStorage.getItem('sanskriti_custom_products') || localStorage.getItem('sih_custom_products') || '[]');
-      let list = [...localProducts, ...FALLBACK_PRODUCTS];
+      const cached = getLocalCachedData('products', FALLBACK_PRODUCTS);
+      let list = [...localProducts, ...cached];
       if (params?.category && params.category !== 'all') {
         list = list.filter((p) => p.category === params.category);
       }
@@ -368,12 +401,16 @@ export const foodService = {
     try {
       const res = await api.get('/food', { params });
       if (res.data?.foods && res.data.foods.length > 0) {
+        if (!params?.search && !params?.placeId && (!params?.diet || params.diet === 'all')) {
+          setLocalCachedData('foods', res.data.foods);
+        }
         return res.data;
       }
       return { success: true, count: FALLBACK_FOODS.length, foods: FALLBACK_FOODS };
     } catch (err) {
       console.warn('Backend /food failed, using cached culinary heritage guide:', err.message);
-      let list = [...FALLBACK_FOODS];
+      const cached = getLocalCachedData('foods', FALLBACK_FOODS);
+      let list = [...cached];
       if (params?.placeId) {
         const pid = Number(params.placeId);
         list = list.filter((f) => f.placeId === pid || (f.alternatePlaceIds && f.alternatePlaceIds.includes(pid)));
@@ -631,6 +668,89 @@ export const artisanVerificationService = {
 
   setCurrentArtisanPehchan: (pehchanId) => {
     localStorage.setItem('sanskriti_current_artisan_pehchan', pehchanId);
+  },
+};
+
+export const supportService = {
+  getAll: async () => {
+    try {
+      const res = await api.get('/support/tickets');
+      if (res.data && res.data.success && Array.isArray(res.data.tickets)) {
+        return { success: true, tickets: res.data.tickets };
+      }
+    } catch (e) {
+      console.warn('Backend getSupportTickets notice:', e.message);
+    }
+
+    // Fallback to local storage
+    try {
+      const stored = JSON.parse(
+        localStorage.getItem('sanskriti_support_tickets') || localStorage.getItem('sih_support_tickets') || '[]'
+      );
+      return { success: true, tickets: stored };
+    } catch {
+      return { success: true, tickets: [] };
+    }
+  },
+
+  updateStatus: async (id, status) => {
+    try {
+      const res = await api.patch(`/support/tickets/${id}/status`, { status });
+      if (res.data && res.data.success) {
+        // Also update local storage for seamless sync
+        try {
+          const stored = JSON.parse(
+            localStorage.getItem('sanskriti_support_tickets') || localStorage.getItem('sih_support_tickets') || '[]'
+          );
+          const updated = stored.map((t) => (t.id === id || t.ticketNumber === id ? { ...t, status } : t));
+          localStorage.setItem('sanskriti_support_tickets', JSON.stringify(updated));
+        } catch {}
+        return res.data;
+      }
+    } catch (e) {
+      console.warn('Backend update ticket status failed, updating locally:', e.message);
+    }
+
+    // Fallback local update
+    try {
+      const stored = JSON.parse(
+        localStorage.getItem('sanskriti_support_tickets') || localStorage.getItem('sih_support_tickets') || '[]'
+      );
+      const updated = stored.map((t) => (t.id === id || t.ticketNumber === id ? { ...t, status } : t));
+      localStorage.setItem('sanskriti_support_tickets', JSON.stringify(updated));
+      return { success: true, message: `Ticket status updated to ${status}` };
+    } catch {
+      return { success: false, message: 'Failed to update ticket status.' };
+    }
+  },
+
+  delete: async (id) => {
+    try {
+      const res = await api.delete(`/support/tickets/${id}`);
+      if (res.data && res.data.success) {
+        try {
+          const stored = JSON.parse(
+            localStorage.getItem('sanskriti_support_tickets') || localStorage.getItem('sih_support_tickets') || '[]'
+          );
+          const updated = stored.filter((t) => t.id !== id && t.ticketNumber !== id);
+          localStorage.setItem('sanskriti_support_tickets', JSON.stringify(updated));
+        } catch {}
+        return res.data;
+      }
+    } catch (e) {
+      console.warn('Backend delete ticket failed, removing locally:', e.message);
+    }
+
+    try {
+      const stored = JSON.parse(
+        localStorage.getItem('sanskriti_support_tickets') || localStorage.getItem('sih_support_tickets') || '[]'
+      );
+      const updated = stored.filter((t) => t.id !== id && t.ticketNumber !== id);
+      localStorage.setItem('sanskriti_support_tickets', JSON.stringify(updated));
+      return { success: true };
+    } catch {
+      return { success: false };
+    }
   },
 };
 

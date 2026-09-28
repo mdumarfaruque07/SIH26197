@@ -15,11 +15,12 @@ import {
   MapPin,
   Store,
   LifeBuoy,
+  Server,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 
-export default function MenuDrawer({ isOpen, onClose, onOpenPostModal }) {
+export default function MenuDrawer({ isOpen, onClose, onOpenPostModal, onOpenServerConfig }) {
   const { user, logout, isGuest } = useAuth();
   const { lang, toggleLanguage, t } = useLanguage();
   const navigate = useNavigate();
@@ -166,6 +167,20 @@ export default function MenuDrawer({ isOpen, onClose, onOpenPostModal }) {
               <LifeBuoy className="w-4 h-4 text-rose-600 flex-shrink-0" />
               <span>{lang === 'hi' ? 'सहायता एवं समस्या रिपोर्ट' : 'Help & Report Issue'}</span>
             </Link>
+
+            <button
+              onClick={() => {
+                onClose();
+                if (onOpenServerConfig) onOpenServerConfig();
+              }}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-emerald-800 bg-emerald-50/80 hover:bg-emerald-100/80 border border-emerald-200/80 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <Server className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <span>{lang === 'hi' ? 'सर्वर कनेक्शन व IP' : 'Server Connection & IP'}</span>
+              </div>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            </button>
 
             {user?.role === 'admin' && (
               <Link

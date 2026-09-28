@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { productService, placeService, foodService } from '../services/api';
+import { productService, placeService, foodService, getLocalCachedData } from '../services/api';
+import { FALLBACK_PRODUCTS, FALLBACK_PLACES, FALLBACK_FOODS } from '../data/fallbackData';
 import {
   ShoppingBag,
   Sparkles,
@@ -43,11 +44,12 @@ const CATEGORIES = [
 ];
 
 export default function BazaarPage() {
-  const [products, setProducts] = useState([]);
-  const [places, setPlaces] = useState([]);
-  const [foodList, setFoodList] = useState([]);
+  // Instant load from cache (0ms first paint)
+  const [products, setProducts] = useState(() => getLocalCachedData('products', FALLBACK_PRODUCTS));
+  const [places, setPlaces] = useState(() => getLocalCachedData('places', FALLBACK_PLACES));
+  const [foodList, setFoodList] = useState(() => getLocalCachedData('foods', FALLBACK_FOODS));
   const [foodModalItem, setFoodModalItem] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [category, setCategory] = useState('all');
   const [selectedPlaceId, setSelectedPlaceId] = useState('');
   const [search, setSearch] = useState('');
@@ -55,7 +57,7 @@ export default function BazaarPage() {
   const [giModalProduct, setGiModalProduct] = useState(null);
 
   const fetchData = async () => {
-    setLoading(true);
+    if (products.length === 0) setLoading(true);
     try {
       const [prodRes, placeRes, foodRes] = await Promise.all([
         productService.getAll({

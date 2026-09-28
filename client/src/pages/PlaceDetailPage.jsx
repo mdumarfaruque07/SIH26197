@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { placeService, productService, foodService } from '../services/api';
 import AudioNarrationPlayer from '../components/AudioNarrationPlayer';
+import InstagramPostCard from '../components/InstagramPostCard';
 import { useLanguage } from '../context/LanguageContext';
 import {
   MapPin,
@@ -876,44 +877,19 @@ export default function PlaceDetailPage({ onOpenPostModal }) {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+            <div className="max-w-xl mx-auto space-y-6">
               {place.posts?.map((post) => (
-                <div
+                <InstagramPostCard
                   key={post.id}
-                  className="rounded-2xl border border-stone-200 overflow-hidden bg-stone-50/50 flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="aspect-[4/3] bg-stone-200 overflow-hidden">
-                      <img
-                        src={post.imageUrl}
-                        alt="User Visit"
-                        className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                        loading="lazy"
-                      />
-                    </div>
-                    <div className="p-3.5 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <img
-                            src={post.user?.avatarUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${post.user?.name}`}
-                            alt={post.user?.name}
-                            className="w-6 h-6 rounded-full border border-stone-200"
-                          />
-                          <span className="text-xs font-bold text-stone-900">{post.user?.name}</span>
-                        </div>
-                        <div className="flex items-center text-amber-500 text-xs font-bold">
-                          <Star className="w-3.5 h-3.5 fill-current" />
-                          <span>{post.rating}</span>
-                        </div>
-                      </div>
-                      {post.caption && (
-                        <p className="text-xs text-stone-600 line-clamp-3 leading-relaxed italic">
-                          "{post.caption}"
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                  post={{
+                    ...post,
+                    place: post.place || {
+                      id: place.id,
+                      name: place.name,
+                      slug: place.slug,
+                    },
+                  }}
+                />
               ))}
             </div>
           )}

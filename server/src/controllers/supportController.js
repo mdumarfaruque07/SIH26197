@@ -67,7 +67,7 @@ export const getSupportTickets = async (req, res) => {
 
     const formatted = tickets.map((t) => ({
       ...t,
-      statusHi: t.status === 'RESOLVED' ? 'निस्तारित' : 'समीक्षाधीन',
+      statusHi: t.status === 'RESOLVED' ? 'निस्तारित' : t.status === 'IN_REVIEW' ? 'समीक्षाधीन' : 'खुला (नया)',
       resolutionEstimate: t.status === 'RESOLVED' ? 'Closed' : '24-48 Hours',
     }));
 
@@ -83,3 +83,72 @@ export const getSupportTickets = async (req, res) => {
     });
   }
 };
+
+export const updateTicketStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const ticketId = parseInt(id);
+    let ticket = null;
+    if (!isNaN(ticketId)) {
+      ticket = await prisma.supportTicket.findUnique({ where: { id: ticketId } });
+    }
+    if (!ticket) {
+      ticket = await prisma.supportTicket.findUnique({ where: { ticketNumber: id } });
+    }
+
+    if (!ticket) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+
+    const updated = await prisma.supportTicket.update({
+      where: { id: ticket.id },
+      data: {
+        status: status || ticket.status,
+      },
+    });
+
+    console.log(`[Support] Ticket ${ticket.ticketNumber} status updated to: ${status}`);
+
+    return res.json({
+      success: true,
+      message: `Ticket status updated to ${status}`,
+      ticket: {
+        ...updated,
+        statusHi: updated.status === 'RESOLVED' ? 'निस्तारित' : updated.status === 'IN_REVIEW' ? 'समीक्षाधीन' : 'खुला',
+        resolutionEstimate: updated.status === 'RESOLVED' ? 'Closed' : '24-48 Hours',
+      },
+    });
+  } catch (error) {
+    console.error('Error updating support ticket status:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update ticket status.' });
+  }
+};
+
+export const deleteSupportTicket = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const ticketId = parseInt(id);
+    let ticket = null;
+    if (!isNaN(ticketId)) {
+      ticket = await prisma.supportTicket.findUnique({ where: { id: ticketId } });
+    }
+    if (!ticket) {
+      ticket = await prisma.supportTicket.findUnique({ where: { ticketNumber: id } });
+    }
+
+    if (!ticket) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+
+    await prisma.supportTicket.delete({ where: { id: ticket.id } });
+    console.log(`[Support] Ticket ${ticket.ticketNumber} deleted from MySQL`);
+
+    return res.json({ success: true, message: 'Ticket deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting support ticket:', error);
+    return res.status(500).json({ success: false, message: 'Failed to delete ticket.' });
+  }
+};
+

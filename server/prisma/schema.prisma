@@ -8,15 +8,18 @@ datasource db {
 }
 
 model User {
-  id           Int        @id @default(autoincrement())
-  name         String
-  email        String     @unique
-  passwordHash String     @map("password_hash")
-  role         String     @default("user") // 'user', 'artisan', 'admin'
-  avatarUrl    String?    @map("avatar_url")
-  createdAt    DateTime   @default(now()) @map("created_at")
-  posts        Post[]
-  bookmarks    Bookmark[]
+  id            Int            @id @default(autoincrement())
+  name          String
+  email         String         @unique
+  passwordHash  String         @map("password_hash")
+  role          String         @default("user") // 'user', 'artisan', 'admin'
+  avatarUrl     String?        @map("avatar_url")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  posts         Post[]
+  bookmarks     Bookmark[]
+  postLikes     PostLike[]
+  postComments  PostComment[]
+  postBookmarks PostBookmark[]
 
   @@map("users")
 }
@@ -58,18 +61,61 @@ model MediaLink {
 }
 
 model Post {
-  id         Int      @id @default(autoincrement())
-  userId     Int      @map("user_id")
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  placeId    Int      @map("place_id")
-  place      Place    @relation(fields: [placeId], references: [id], onDelete: Cascade)
-  rating     Int      @default(5)
-  caption    String?  @db.Text
-  imageUrl   String   @map("image_url")
-  isApproved Boolean  @default(true) @map("is_approved")
-  createdAt  DateTime @default(now()) @map("created_at")
+  id            Int            @id @default(autoincrement())
+  userId        Int            @map("user_id")
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  placeId       Int            @map("place_id")
+  place         Place          @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  rating        Int            @default(5)
+  caption       String?        @db.Text
+  imageUrl      String         @map("image_url")
+  likesCount    Int            @default(24) @map("likes_count")
+  isApproved    Boolean        @default(true) @map("is_approved")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  likes         PostLike[]
+  comments      PostComment[]
+  postBookmarks PostBookmark[]
 
   @@map("posts")
+}
+
+model PostLike {
+  id        Int      @id @default(autoincrement())
+  postId    Int      @map("post_id")
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    Int?     @map("user_id")
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress String?  @map("ip_address")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([postId, userId])
+  @@map("post_likes")
+}
+
+model PostComment {
+  id         Int      @id @default(autoincrement())
+  postId     Int      @map("post_id")
+  post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId     Int?     @map("user_id")
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  authorName String   @map("author_name")
+  avatarUrl  String?  @map("avatar_url")
+  text       String   @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("post_comments")
+}
+
+model PostBookmark {
+  id        Int      @id @default(autoincrement())
+  postId    Int      @map("post_id")
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    Int?     @map("user_id")
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([postId, userId])
+  @@map("post_bookmarks")
 }
 
 model Bookmark {
