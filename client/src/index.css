@@ -74,3 +74,11 @@
   animation: fadeInOverlay 0.22s ease-out forwards;
 }
 
+/* Bulletproof Background Scroll Lock for Mobile & Desktop */
+body.modal-scroll-locked {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  touch-action: none;
+}
+
+

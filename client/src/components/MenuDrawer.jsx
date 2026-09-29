@@ -177,7 +177,7 @@ export default function MenuDrawer({ isOpen, onClose, onOpenPostModal, onOpenSer
             >
               <div className="flex items-center gap-3">
                 <Server className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                <span>{lang === 'hi' ? 'सर्वर कनेक्शन व IP' : 'Server Connection & IP'}</span>
+                <span>{lang === 'hi' ? 'सर्वर व Cloudflare सिंक' : 'Server & Cloudflare Sync'}</span>
               </div>
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             </button>

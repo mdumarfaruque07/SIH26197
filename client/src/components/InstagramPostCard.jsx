@@ -22,6 +22,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { postService } from '../services/api';
+import { lockBodyScroll, unlockBodyScroll } from '../utils/scrollLock';
 
 // Sample realistic community comments for seed posts
 const INITIAL_DEMO_COMMENTS = {
@@ -157,21 +158,21 @@ export default function InstagramPostCard({ post, onLikeChange, onPostDelete, on
   const [copiedShare, setCopiedShare] = useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
 
-  // When comment drawer is open, lock body scroll and hide bottom navigation bar
+  // When comment drawer is open, lock body scroll completely and hide bottom navigation bar
   useEffect(() => {
     if (isCommentDrawerOpen) {
-      document.body.style.overflow = 'hidden';
+      lockBodyScroll();
       window.dispatchEvent(
         new CustomEvent('sanskriti_comment_drawer_toggle', { detail: { open: true } })
       );
     } else {
-      document.body.style.overflow = '';
+      unlockBodyScroll();
       window.dispatchEvent(
         new CustomEvent('sanskriti_comment_drawer_toggle', { detail: { open: false } })
       );
     }
     return () => {
-      document.body.style.overflow = '';
+      unlockBodyScroll();
       window.dispatchEvent(
         new CustomEvent('sanskriti_comment_drawer_toggle', { detail: { open: false } })
       );
@@ -988,11 +989,12 @@ export default function InstagramPostCard({ post, onLikeChange, onPostDelete, on
       {isCommentDrawerOpen &&
         typeof document !== 'undefined' &&
         createPortal(
-          <div className="fixed inset-0 z-[100000] flex items-end sm:items-center justify-center animate-fadeIn">
-            {/* Dark blurred backdrop */}
+          <div className="fixed inset-0 z-[100000] flex items-end sm:items-center justify-center animate-fadeIn overscroll-contain">
+            {/* Dark blurred backdrop with touchmove prevention */}
             <div
               onClick={() => setIsCommentDrawerOpen(false)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-xs transition-opacity cursor-pointer"
+              onTouchMove={(e) => e.preventDefault()}
+              className="absolute inset-0 bg-black/60 backdrop-blur-xs transition-opacity cursor-pointer touch-none overscroll-contain"
             />
 
             {/* Drawer Container (Slides up from bottom) */}
@@ -1025,7 +1027,7 @@ export default function InstagramPostCard({ post, onLikeChange, onPostDelete, on
               </div>
 
               {/* 2. Scrollable Body */}
-              <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+              <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4 overscroll-contain">
                 {/* Original Post Author Caption Card (Pinned at top of comments) */}
                 {currentCaption && (
                   <div className="flex items-start gap-3 pb-3 border-b border-stone-100">

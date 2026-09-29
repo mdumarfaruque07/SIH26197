@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { UserPlus, Landmark, AlertCircle, Loader2, Compass } from 'lucide-react';
+import { UserPlus, Landmark, AlertCircle, Loader2, Compass, Settings, Server } from 'lucide-react';
+import ServerConfigModal from '../components/ServerConfigModal';
+import { getApiBaseUrl } from '../services/api';
 
 export default function RegisterPage() {
   const { register, continueAsGuest } = useAuth();
   const navigate = useNavigate();
+  const [serverConfigOpen, setServerConfigOpen] = useState(false);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -39,9 +42,24 @@ export default function RegisterPage() {
         </div>
 
         {error && (
-          <div className="p-3 bg-red-50 text-red-700 text-xs rounded-xl border border-red-200 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            <span>{error}</span>
+          <div className="p-3.5 bg-red-50 text-red-700 text-xs rounded-2xl border border-red-200 space-y-2">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span className="font-semibold">{error}</span>
+            </div>
+            {(error.includes('timeout') || error.includes('Network') || error.includes('failed') || error.includes('exceeded')) && (
+              <div className="pt-2 border-t border-red-100 flex items-center justify-between gap-2">
+                <span className="text-[11px] text-stone-600 truncate">IP: {getApiBaseUrl().replace('/api', '')}</span>
+                <button
+                  type="button"
+                  onClick={() => setServerConfigOpen(true)}
+                  className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-[10px] flex items-center gap-1 shadow-xs"
+                >
+                  <Settings className="w-3 h-3" />
+                  <span>Configure IP</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -142,7 +160,24 @@ export default function RegisterPage() {
             Sign In here
           </Link>
         </p>
+
+        {/* Server IP quick config trigger */}
+        <div className="pt-2 border-t border-stone-100 flex items-center justify-center">
+          <button
+            type="button"
+            onClick={() => setServerConfigOpen(true)}
+            className="text-[11px] text-stone-400 hover:text-amber-700 flex items-center gap-1 transition-colors"
+          >
+            <Server className="w-3 h-3 text-amber-500" />
+            <span>Server: {getApiBaseUrl().replace('/api', '')}</span>
+          </button>
+        </div>
       </div>
+
+      <ServerConfigModal
+        isOpen={serverConfigOpen}
+        onClose={() => setServerConfigOpen(false)}
+      />
     </div>
   );
 }

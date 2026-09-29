@@ -5,6 +5,7 @@ import { useLanguage } from '../context/LanguageContext';
 import ReportIssueModal from '../components/ReportIssueModal';
 import InstagramPostCard from '../components/InstagramPostCard';
 import PostModal from '../components/PostModal';
+import ServerConfigModal from '../components/ServerConfigModal';
 import { postService } from '../services/api';
 import {
   User,
@@ -34,6 +35,8 @@ import {
   ChevronUp,
   ShieldAlert,
   RefreshCw,
+  Server,
+  Radio,
 } from 'lucide-react';
 
 const CULTURAL_AVATARS = [
@@ -89,6 +92,7 @@ export default function ProfilePage() {
   const [postModalOpen, setPostModalOpen] = useState(false);
 
   // Support & Grievance states
+  const [serverConfigOpen, setServerConfigOpen] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(() => {
     return searchParams.get('report') === 'true';
   });
@@ -713,6 +717,41 @@ export default function ProfilePage() {
                   />
                 </button>
               </div>
+
+              {/* Live Server & Cloudflare Remote Sync */}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50/80 via-orange-50/40 to-stone-50 border border-amber-200/90 shadow-2xs space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-2xl bg-amber-600 text-white shadow-xs shrink-0">
+                      <Server className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-xs text-stone-900">
+                          {lang === 'hi' ? 'लाइव सर्वर एवं क्लाउडफ्लेयर सिंक' : 'Live Database & Cloudflare Sync'}
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          {lang === 'hi' ? 'रिमोट टेस्टिंग' : 'Remote Live Testing'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-stone-500 mt-0.5">
+                        {lang === 'hi'
+                          ? 'किसी भी टेस्टर के फोन में लाइव डेटाबेस सिंक करने हेतु Cloudflare Tunnel लिंक या लैपटॉप IP जोड़ें।'
+                          : 'Connect live MySQL database across different Wi-Fi networks anywhere via Cloudflare Tunnel URL.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setServerConfigOpen(true)}
+                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-amber-700 hover:bg-amber-800 active:scale-95 text-white text-xs font-bold shadow-xs transition-all shrink-0 cursor-pointer"
+                  >
+                    <Radio className="w-3.5 h-3.5 text-amber-300" />
+                    <span>{lang === 'hi' ? 'सर्वर लिंक बदलें' : 'Configure Server'}</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Help, Support & Citizen Grievance Portal */}
@@ -1013,6 +1052,12 @@ export default function ProfilePage() {
         isOpen={reportModalOpen}
         onClose={() => setReportModalOpen(false)}
         onTicketCreated={handleTicketCreated}
+      />
+
+      {/* Server & Cloudflare Configuration Modal */}
+      <ServerConfigModal
+        isOpen={serverConfigOpen}
+        onClose={() => setServerConfigOpen(false)}
       />
     </div>
   );

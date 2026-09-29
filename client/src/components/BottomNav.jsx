@@ -8,24 +8,30 @@ export default function BottomNav({ onOpenSearch }) {
   const location = useLocation();
   const isKeyboardVisible = useKeyboardVisible();
   const { lang, t } = useLanguage();
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isOverlayOpen, setIsOverlayOpen] = useState(false);
 
   useEffect(() => {
-    const handler = (e) => {
-      setIsDrawerOpen(Boolean(e.detail?.open));
+    const handleToggle = (e) => {
+      setIsOverlayOpen(Boolean(e.detail?.open));
     };
-    window.addEventListener('sanskriti_comment_drawer_toggle', handler);
-    return () => window.removeEventListener('sanskriti_comment_drawer_toggle', handler);
+    window.addEventListener('sanskriti_comment_drawer_toggle', handleToggle);
+    window.addEventListener('sanskriti_story_toggle', handleToggle);
+    window.addEventListener('sanskriti_modal_toggle', handleToggle);
+    return () => {
+      window.removeEventListener('sanskriti_comment_drawer_toggle', handleToggle);
+      window.removeEventListener('sanskriti_story_toggle', handleToggle);
+      window.removeEventListener('sanskriti_modal_toggle', handleToggle);
+    };
   }, []);
 
-  // Hide bottom navigation bar on authentication screens, when mobile keyboard is active, or when comment drawer popup is open
+  // Hide bottom navigation bar on auth screens, keyboard active, comments drawer, or full-screen stories
   const isAuthRoute =
     location.pathname.startsWith('/login') ||
     location.pathname.startsWith('/register') ||
     location.pathname.includes('/login') ||
     location.pathname.includes('/register');
 
-  if (isAuthRoute || isKeyboardVisible || isDrawerOpen) {
+  if (isAuthRoute || isKeyboardVisible || isOverlayOpen) {
     return null;
   }
 

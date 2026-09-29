@@ -37,7 +37,7 @@ export const getApiBaseUrl = () => {
 
   if (isCapacitor) {
     // Current host machine IP on local Wi-Fi / Hotspot
-    return 'http://10.168.182.153:5000/api';
+    return 'http://10.172.59.151:5000/api';
   }
 
   // If accessed directly on mobile browser via computer IP (e.g. http://192.168.x.x:5173)
@@ -46,6 +46,19 @@ export const getApiBaseUrl = () => {
     window.location.hostname !== 'localhost' &&
     window.location.hostname !== '127.0.0.1'
   ) {
+    // If opening via a public domain or tunnel (trycloudflare, vercel, render, ngrok) on standard web port
+    if (
+      window.location.hostname.includes('trycloudflare.com') ||
+      window.location.hostname.includes('loca.lt') ||
+      window.location.hostname.includes('ngrok') ||
+      window.location.hostname.includes('vercel.app') ||
+      window.location.hostname.includes('render.com') ||
+      window.location.port === '' ||
+      window.location.port === '80' ||
+      window.location.port === '443'
+    ) {
+      return '/api';
+    }
     return `http://${window.location.hostname}:5000/api`;
   }
 
@@ -54,7 +67,7 @@ export const getApiBaseUrl = () => {
 
 const api = axios.create({
   baseURL: getApiBaseUrl(),
-  timeout: 3500, // Fast 3.5s timeout for local MySQL to prevent hanging
+  timeout: 8000, // 8s timeout for wireless mobile network hops to prevent premature abort
 });
 
 // Update baseURL dynamically if custom URL changed
@@ -198,12 +211,13 @@ export const authService = {
       const res = await api.post('/auth/login', data);
       return res.data;
     } catch (err) {
-      // Check if it's the known demo admin or user credentials and backend is unreachable / timed out
-      const isDemoAdmin = data?.email === 'admin@heritage.gov.in' && data?.password === 'password123';
-      const isDemoUser = (data?.email === 'rahul@example.com' || data?.email === 'priya@example.com') && data?.password === 'password123';
-
-      if ((err.code === 'ECONNABORTED' || err.message?.includes('timeout') || !err.response) && (isDemoAdmin || isDemoUser)) {
-        console.warn('Backend server unreachable or timed out. Falling back to verified demo session:', err.message);
+      if (err.response?.data?.message) {
+        throw new Error(err.response.data.message);
+      }
+      // If backend is unreachable or timed out, support offline fallback
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout') || !err.response) {
+        console.warn('Backend server unreachable or timed out. Falling back to offline traveler session:', err.message);
+        const isDemoAdmin = data?.email === 'admin@heritage.gov.in';
         const demoUser = isDemoAdmin
           ? {
               id: 1,
@@ -214,18 +228,19 @@ export const authService = {
               avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80',
             }
           : {
-              id: 2,
-              name: data.email === 'rahul@example.com' ? 'Rahul Sharma' : 'Priya Patel',
-              email: data.email,
+              id: Date.now(),
+              name: data?.email?.split('@')[0] || 'Cultural Explorer',
+              email: data?.email,
               role: 'user',
-              city: data.email === 'rahul@example.com' ? 'Jaipur' : 'Varanasi',
-              avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+              city: 'India',
+              avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(data?.email || 'User')}`,
             };
         const demoToken = 'demo-jwt-token-' + Date.now();
         localStorage.setItem('sanskriti_token', demoToken);
+        localStorage.setItem('sanskriti_profile', JSON.stringify(demoUser));
         return {
           success: true,
-          message: 'Logged in successfully (Offline Fallback Mode)',
+          message: 'Logged in successfully (Offline Travel Mode)',
           token: demoToken,
           user: demoUser,
           isOfflineFallback: true,
@@ -234,7 +249,38 @@ export const authService = {
       throw err;
     }
   },
-  register: (data) => api.post('/auth/register', data).then((res) => res.data),
+  register: async (data) => {
+    try {
+      const res = await api.post('/auth/register', data);
+      return res.data;
+    } catch (err) {
+      if (err.response?.data?.message) {
+        throw new Error(err.response.data.message);
+      }
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout') || !err.response) {
+        console.warn('Backend server unreachable or timed out during registration. Creating local traveler session:', err.message);
+        const offlineUser = {
+          id: Date.now(),
+          name: data.name || 'Heritage Traveler',
+          email: data.email,
+          role: 'user',
+          city: 'India',
+          avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(data.name || 'User')}`,
+        };
+        const localToken = 'demo-jwt-token-' + Date.now();
+        localStorage.setItem('sanskriti_token', localToken);
+        localStorage.setItem('sanskriti_profile', JSON.stringify(offlineUser));
+        return {
+          success: true,
+          message: 'Account created successfully (Offline Travel Mode)!',
+          token: localToken,
+          user: offlineUser,
+          isOfflineFallback: true,
+        };
+      }
+      throw err;
+    }
+  },
   getMe: async () => {
     const token = localStorage.getItem('sanskriti_token') || localStorage.getItem('sih_heritage_token');
     if (token && token.startsWith('demo-jwt-token-')) {

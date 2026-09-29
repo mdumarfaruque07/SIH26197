@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import {
   Sparkles,
@@ -12,6 +13,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { lockBodyScroll, unlockBodyScroll } from '../utils/scrollLock';
 
 export const HERITAGE_STORIES = [
   {
@@ -103,11 +105,39 @@ export const HERITAGE_STORIES = [
 export default function InstagramStoryBar({ onOpenPostModal }) {
   const { lang } = useLanguage();
   const [activeStoryIdx, setActiveStoryIdx] = useState(null);
+  const [progress, setProgress] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
 
   const activeStory = activeStoryIdx !== null ? HERITAGE_STORIES[activeStoryIdx] : null;
 
+  // Bulletproof body scroll locking & bottom navigation bar hiding
+  useEffect(() => {
+    const isStoryOpen = activeStoryIdx !== null;
+    if (isStoryOpen) {
+      lockBodyScroll();
+      window.dispatchEvent(
+        new CustomEvent('sanskriti_story_toggle', { detail: { open: true } })
+      );
+    } else {
+      unlockBodyScroll();
+      window.dispatchEvent(
+        new CustomEvent('sanskriti_story_toggle', { detail: { open: false } })
+      );
+    }
+    return () => {
+      if (isStoryOpen) {
+        unlockBodyScroll();
+        window.dispatchEvent(
+          new CustomEvent('sanskriti_story_toggle', { detail: { open: false } })
+        );
+      }
+    };
+  }, [activeStoryIdx]);
+
+  // Story progression logic
   const nextStory = () => {
-    if (activeStoryIdx < HERITAGE_STORIES.length - 1) {
+    setProgress(0);
+    if (activeStoryIdx !== null && activeStoryIdx < HERITAGE_STORIES.length - 1) {
       setActiveStoryIdx(activeStoryIdx + 1);
     } else {
       setActiveStoryIdx(null);
@@ -115,10 +145,33 @@ export default function InstagramStoryBar({ onOpenPostModal }) {
   };
 
   const prevStory = () => {
-    if (activeStoryIdx > 0) {
+    setProgress(0);
+    if (activeStoryIdx !== null && activeStoryIdx > 0) {
       setActiveStoryIdx(activeStoryIdx - 1);
     }
   };
+
+  // Auto-progress stories every 5.5 seconds (paused when user presses or touches screen)
+  useEffect(() => {
+    if (activeStoryIdx === null || isPaused) return;
+
+    setProgress(0);
+    const intervalMs = 50;
+    const totalMs = 5500;
+    const step = (intervalMs / totalMs) * 100;
+
+    const timer = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) {
+          nextStory();
+          return 0;
+        }
+        return prev + step;
+      });
+    }, intervalMs);
+
+    return () => clearInterval(timer);
+  }, [activeStoryIdx, isPaused]);
 
   return (
     <div className="w-full">
@@ -146,7 +199,10 @@ export default function InstagramStoryBar({ onOpenPostModal }) {
         {HERITAGE_STORIES.map((story, idx) => (
           <button
             key={story.id}
-            onClick={() => setActiveStoryIdx(idx)}
+            onClick={() => {
+              setProgress(0);
+              setActiveStoryIdx(idx);
+            }}
             className="flex flex-col items-center gap-1.5 flex-shrink-0 cursor-pointer group"
           >
             {/* Instagram Gradient Ring */}
@@ -166,118 +222,143 @@ export default function InstagramStoryBar({ onOpenPostModal }) {
         ))}
       </div>
 
-      {/* Full-Screen Instagram Story Viewer Modal */}
-      {activeStory && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/90 backdrop-blur-md animate-fadeIn">
-          <div className="relative w-full max-w-sm sm:max-w-md h-[90vh] max-h-[750px] bg-stone-900 rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-between border border-stone-800">
-            {/* Top Story Progress Bar */}
-            <div className="absolute top-0 inset-x-0 z-30 p-3 pt-3.5 flex items-center gap-1 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
-              {HERITAGE_STORIES.map((s, i) => (
-                <div
-                  key={s.id}
-                  className="h-1 flex-1 rounded-full bg-white/30 overflow-hidden"
-                >
+      {/* Full-Screen Instagram Story Viewer Modal (Portaled directly to document.body) */}
+      {activeStory &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[100000] flex items-center justify-center bg-black sm:bg-black/95 sm:backdrop-blur-md animate-fadeIn overscroll-contain touch-none select-none"
+            onTouchMove={(e) => e.preventDefault()}
+          >
+            {/* Story Phone Canvas (Full screen on mobile, aesthetic phone frame on desktop) */}
+            <div
+              className="relative w-full h-full sm:h-[92vh] sm:max-w-md sm:rounded-3xl bg-stone-950 overflow-hidden shadow-2xl flex flex-col justify-between border-0 sm:border sm:border-stone-800"
+              onMouseDown={() => setIsPaused(true)}
+              onMouseUp={() => setIsPaused(false)}
+              onTouchStart={() => setIsPaused(true)}
+              onTouchEnd={() => setIsPaused(false)}
+            >
+              {/* Top Story Progress Bar */}
+              <div className="absolute top-0 inset-x-0 z-30 p-3 pt-3.5 flex items-center gap-1 bg-gradient-to-b from-black/85 via-black/40 to-transparent">
+                {HERITAGE_STORIES.map((s, i) => (
                   <div
-                    className={`h-full bg-white transition-all duration-300 ${
-                      i < activeStoryIdx
-                        ? 'w-full'
-                        : i === activeStoryIdx
-                        ? 'w-full animate-pulse'
-                        : 'w-0'
-                    }`}
-                  />
-                </div>
-              ))}
-            </div>
-
-            {/* Header: Monument Name & Close */}
-            <div className="absolute top-5 inset-x-0 z-30 px-4 pt-2 flex items-center justify-between text-white">
-              <div className="flex items-center gap-2.5">
-                <img
-                  src={activeStory.previewImage}
-                  alt={activeStory.name}
-                  className="w-9 h-9 rounded-full object-cover border-2 border-amber-400"
-                />
-                <div>
-                  <div className="font-bold text-sm leading-tight flex items-center gap-1.5">
-                    <span>{lang === 'hi' ? activeStory.nameHi : activeStory.name}</span>
-                    <span className="text-[10px] bg-amber-500/80 px-1.5 py-0.2 rounded-md font-semibold">
-                      Story
-                    </span>
+                    key={s.id}
+                    className="h-1 flex-1 rounded-full bg-white/30 overflow-hidden"
+                  >
+                    <div
+                      className="h-full bg-white transition-all"
+                      style={{
+                        width:
+                          i < activeStoryIdx
+                            ? '100%'
+                            : i === activeStoryIdx
+                            ? `${progress}%`
+                            : '0%',
+                        transitionDuration: i === activeStoryIdx ? '50ms' : '200ms',
+                      }}
+                    />
                   </div>
-                  <p className="text-[11px] text-stone-300 flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-amber-400" />
-                    <span>{activeStory.location}</span>
-                  </p>
+                ))}
+              </div>
+
+              {/* Header: Monument Name & Close Button */}
+              <div className="absolute top-5 inset-x-0 z-30 px-4 pt-2 flex items-center justify-between text-white">
+                <div className="flex items-center gap-2.5">
+                  <img
+                    src={activeStory.previewImage}
+                    alt={activeStory.name}
+                    className="w-9 h-9 rounded-full object-cover border-2 border-amber-400"
+                  />
+                  <div>
+                    <div className="font-bold text-sm leading-tight flex items-center gap-1.5">
+                      <span>{lang === 'hi' ? activeStory.nameHi : activeStory.name}</span>
+                      <span className="text-[10px] bg-amber-500/80 px-1.5 py-0.2 rounded-md font-semibold text-white">
+                        Story
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-stone-300 flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-amber-400" />
+                      <span>{activeStory.location}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveStoryIdx(null)}
+                  className="p-2 rounded-full bg-black/50 hover:bg-black/80 text-white transition-colors cursor-pointer border border-white/20 active:scale-95"
+                  aria-label="Close story"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Story Main Image */}
+              <div className="relative w-full h-full flex items-center justify-center">
+                <img
+                  src={activeStory.fullImage}
+                  alt={activeStory.name}
+                  className="w-full h-full object-cover select-none"
+                  draggable={false}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-transparent to-black/40" />
+
+                {/* Left/Right Tap Zones for Story Navigation */}
+                <button
+                  type="button"
+                  onClick={prevStory}
+                  disabled={activeStoryIdx === 0}
+                  className="absolute left-0 inset-y-0 w-1/3 z-20 focus:outline-none cursor-pointer"
+                  aria-label="Previous story"
+                />
+                <button
+                  type="button"
+                  onClick={nextStory}
+                  className="absolute right-0 inset-y-0 w-2/3 z-20 focus:outline-none cursor-pointer"
+                  aria-label="Next story"
+                />
+              </div>
+
+              {/* Story Bottom Fact Card */}
+              <div className="absolute bottom-0 inset-x-0 z-30 p-5 pb-6 sm:pb-5 space-y-3 bg-gradient-to-t from-black via-black/85 to-transparent text-white">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{activeStory.tag}</span>
+                </div>
+
+                <p className="text-sm font-medium leading-relaxed text-stone-200">
+                  "{lang === 'hi' ? activeStory.storyFactHi : activeStory.storyFact}"
+                </p>
+
+                {/* Action Buttons: View Full Monument Chronicles */}
+                <div className="pt-1 flex items-center gap-2">
+                  <Link
+                    to={`/place/${activeStory.slug}`}
+                    onClick={() => setActiveStoryIdx(null)}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-amber-600 via-orange-600 to-rose-600 hover:opacity-95 text-white rounded-2xl text-xs font-bold shadow-lg transition-all active:scale-95"
+                  >
+                    <span>
+                      {lang === 'hi'
+                        ? 'पूरी धरोहर कथा एवं ऑडियो गाइड'
+                        : 'Explore Full Lore & Audio'}
+                    </span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+
+                  <Link
+                    to="/map"
+                    onClick={() => setActiveStoryIdx(null)}
+                    className="p-3 rounded-2xl bg-white/20 hover:bg-white/30 text-white transition-colors active:scale-95"
+                    title="View on Map"
+                  >
+                    <MapPin className="w-4 h-4 text-amber-300" />
+                  </Link>
                 </div>
               </div>
-
-              <button
-                onClick={() => setActiveStoryIdx(null)}
-                className="p-2 rounded-full bg-black/40 hover:bg-black/70 text-white transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
             </div>
-
-            {/* Story Main Image */}
-            <div className="relative w-full h-full flex items-center justify-center">
-              <img
-                src={activeStory.fullImage}
-                alt={activeStory.name}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-black/40" />
-
-              {/* Left/Right Tap Zones for Story Navigation */}
-              <button
-                onClick={prevStory}
-                disabled={activeStoryIdx === 0}
-                className="absolute left-0 inset-y-0 w-1/3 z-20 focus:outline-none"
-                aria-label="Previous story"
-              />
-              <button
-                onClick={nextStory}
-                className="absolute right-0 inset-y-0 w-1/3 z-20 focus:outline-none"
-                aria-label="Next story"
-              />
-            </div>
-
-            {/* Story Bottom Fact Card */}
-            <div className="absolute bottom-0 inset-x-0 z-30 p-5 space-y-3 bg-gradient-to-t from-black via-black/80 to-transparent text-white">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>{activeStory.tag}</span>
-              </div>
-
-              <p className="text-sm font-medium leading-relaxed text-stone-200">
-                "{lang === 'hi' ? activeStory.storyFactHi : activeStory.storyFact}"
-              </p>
-
-              {/* Action Button: View Full Monument Chronicles */}
-              <div className="pt-1 flex items-center gap-2">
-                <Link
-                  to={`/place/${activeStory.slug}`}
-                  onClick={() => setActiveStoryIdx(null)}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-gradient-to-r from-amber-600 to-rose-600 hover:from-amber-500 hover:to-rose-500 text-white rounded-2xl text-xs font-bold shadow-lg transition-all active:scale-95"
-                >
-                  <span>{lang === 'hi' ? 'पूरी धरोहर व ऑडियो सुनें' : 'Explore Full Lore & Audio'}</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-
-                <Link
-                  to="/map"
-                  onClick={() => setActiveStoryIdx(null)}
-                  className="p-2.5 rounded-2xl bg-white/20 hover:bg-white/30 text-white transition-colors"
-                  title="View on Map"
-                >
-                  <MapPin className="w-4 h-4 text-amber-300" />
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

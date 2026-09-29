@@ -3,6 +3,7 @@ import { X, Star, Upload, Image as ImageIcon, Loader2, Search, Camera, RefreshCw
 import { Camera as CameraPlugin, CameraResultType, CameraSource } from '@capacitor/camera';
 import { placeService, postService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { lockBodyScroll, unlockBodyScroll } from '../utils/scrollLock';
 
 export default function PostModal({ isOpen, onClose, onSuccess, initialPlaceId = null }) {
   const { user } = useAuth();
@@ -33,6 +34,10 @@ export default function PostModal({ isOpen, onClose, onSuccess, initialPlaceId =
 
   useEffect(() => {
     if (isOpen) {
+      lockBodyScroll();
+      window.dispatchEvent(
+        new CustomEvent('sanskriti_modal_toggle', { detail: { open: true } })
+      );
       placeService.getAll().then((res) => {
         if (res.success) {
           setPlaces(res.places);
@@ -42,7 +47,20 @@ export default function PostModal({ isOpen, onClose, onSuccess, initialPlaceId =
           }
         }
       });
+    } else {
+      unlockBodyScroll();
+      window.dispatchEvent(
+        new CustomEvent('sanskriti_modal_toggle', { detail: { open: false } })
+      );
     }
+    return () => {
+      if (isOpen) {
+        unlockBodyScroll();
+        window.dispatchEvent(
+          new CustomEvent('sanskriti_modal_toggle', { detail: { open: false } })
+        );
+      }
+    };
   }, [isOpen, initialPlaceId]);
 
   if (!isOpen) return null;
