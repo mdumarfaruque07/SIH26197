@@ -15,23 +15,84 @@ function formatTimeAgo(date) {
 export async function createPost(req, res) {
   try {
     let userId = req.user?.id;
+    if (userId) {
+      const u = await prisma.user.findUnique({ where: { id: userId } });
+      if (!u) userId = null;
+    }
     if (!userId) {
       const defaultUser = await prisma.user.findFirst();
-      userId = defaultUser ? defaultUser.id : 8;
+      if (defaultUser) {
+        userId = defaultUser.id;
+      } else {
+        const newUser = await prisma.user.create({
+          data: {
+            name: 'Culture Explorer',
+            email: `traveler_${Date.now()}@heritage.gov.in`,
+            passwordHash: 'guest_hash',
+            role: 'user',
+            city: 'Agra',
+          },
+        });
+        userId = newUser.id;
+      }
     }
 
-    const { placeId, rating, caption, imageUrl: bodyImageUrl } = req.body;
+    const { placeId, rating, caption, imageUrl: bodyImageUrl, placeSlug, placeName } = req.body;
 
-    if (!placeId) {
-      return res.status(400).json({ success: false, message: 'placeId is required.' });
+    let targetPlaceId = parseInt(placeId);
+    let place = null;
+
+    if (!isNaN(targetPlaceId)) {
+      place = await prisma.place.findUnique({ where: { id: targetPlaceId } });
     }
+
+    if (!place) {
+      // Map legacy fallback IDs to slugs
+      const fallbackMap = {
+        8: 'taj-mahal',
+        9: 'hampi-monuments',
+        10: 'konark-sun-temple',
+        11: 'meenakshi-amman-temple',
+        12: 'varanasi-ghats',
+        13: 'amer-fort-jaipur',
+        14: 'qutub-minar',
+      };
+      const slugCandidate = fallbackMap[targetPlaceId] || placeSlug;
+      if (slugCandidate) {
+        place = await prisma.place.findFirst({
+          where: {
+            OR: [
+              { slug: slugCandidate },
+              { slug: { contains: slugCandidate } },
+            ],
+          },
+        });
+      }
+    }
+
+    if (!place && placeName) {
+      place = await prisma.place.findFirst({
+        where: {
+          name: { contains: placeName },
+        },
+      });
+    }
+
+    if (!place) {
+      place = await prisma.place.findFirst();
+    }
+
+    if (!place) {
+      return res.status(400).json({ success: false, message: 'No valid heritage site found in database.' });
+    }
+    targetPlaceId = place.id;
 
     let finalImageUrl = bodyImageUrl;
     if (req.file) {
       finalImageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
     }
 
-    if (!finalImageUrl) {
+    if (!finalImageUrl || !finalImageUrl.trim()) {
       return res.status(400).json({ success: false, message: 'An image file or imageUrl is required.' });
     }
 
@@ -41,21 +102,21 @@ export async function createPost(req, res) {
     const post = await prisma.post.create({
       data: {
         userId,
-        placeId: parseInt(placeId),
+        placeId: targetPlaceId,
         rating: clampedRating,
         caption: caption || '',
-        imageUrl: finalImageUrl,
+        imageUrl: finalImageUrl.trim(),
         likesCount: Math.floor(20 + Math.random() * 25),
         isApproved: true,
       },
       include: {
         user: { select: { id: true, name: true, avatarUrl: true } },
-        place: { select: { id: true, name: true, slug: true } },
+        place: { select: { id: true, name: true, slug: true, category: true, state: true } },
         comments: true,
       },
     });
 
-    console.log(`[MySQL] New review post created in DB: ID ${post.id} for place ${post.placeId}`);
+    console.log(`[MySQL] New review post created in DB: ID ${post.id} for place ${post.placeId} (${place.name})`);
 
     return res.status(201).json({
       success: true,
@@ -67,17 +128,179 @@ export async function createPost(req, res) {
     });
   } catch (error) {
     console.error('createPost error:', error);
-    return res.status(500).json({ success: false, message: 'Failed to create post.' });
+    return res.status(500).json({ success: false, message: error.message || 'Failed to create post.' });
   }
+}
+
+/**
+ * Haversine formula to compute distance between two lat/lng points in kilometers
+ */
+function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
+  if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return null;
+  const R = 6371; // Earth radius in km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) *
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/**
+ * Smart Feed Recommendation Algorithm (Instagram / YouTube Shorts inspired)
+ * Factors:
+ * 1. Engagement Velocity: Likes (1.8x), Comments (3.2x), Rating (2.0x)
+ * 2. Time-Decay Gravity Curve: Recency with exponential drop-off for older posts
+ * 3. Freshness Discovery Boost: Newly published posts (< 12h) get initial discovery push
+ * 4. Geolocation Proximity: Nearby heritage sites get localized boost
+ * 5. Content Quality Signals: Detailed captions, high resolutions, rich places
+ */
+function calculateFeedPostScore(post, { userLat, userLng, userCity, currentUserId }) {
+  const likesCount = Number(post.likesCount || post.likes?.length || 0);
+  const commentsCount = Number(post.comments?.length || 0);
+  const rating = Number(post.rating || 5);
+
+  // 1. Base engagement score
+  const engagementScore = likesCount * 1.8 + commentsCount * 3.2 + rating * 2.0;
+
+  // 2. Time decay (Gravity curve like Reddit / Hacker News / Instagram)
+  const now = Date.now();
+  const postTime = new Date(post.createdAt || now).getTime();
+  const ageHours = Math.max(0.1, (now - postTime) / (1000 * 60 * 60));
+  // Gravity exponent 1.25
+  const gravityDecay = 1 / Math.pow(ageHours + 2, 1.25);
+
+  // 3. Discovery / Freshness boost for newly uploaded content
+  let freshnessBoost = 0;
+  let isFresh = false;
+  if (ageHours <= 6) {
+    freshnessBoost = 35; // Hot new discovery push
+    isFresh = true;
+  } else if (ageHours <= 24) {
+    freshnessBoost = 20;
+    isFresh = true;
+  } else if (ageHours <= 72) {
+    freshnessBoost = 10;
+  }
+
+  // 4. Proximity / Geo-location boost
+  let proximityBoost = 0;
+  let distKm = null;
+  let isNearby = false;
+  if (userLat != null && userLng != null && post.place?.latitude && post.place?.longitude) {
+    distKm = calculateHaversineDistance(userLat, userLng, post.place.latitude, post.place.longitude);
+    if (distKm !== null) {
+      if (distKm <= 50) {
+        proximityBoost = 28; // Local monument viral boost
+        isNearby = true;
+      } else if (distKm <= 150) {
+        proximityBoost = 18;
+        isNearby = true;
+      } else if (distKm <= 400) {
+        proximityBoost = 10;
+      }
+    }
+  }
+
+  // City / State text match boost
+  if (userCity && post.place?.state && post.place.state.toLowerCase().includes(userCity.toLowerCase())) {
+    proximityBoost += 12;
+    isNearby = true;
+  }
+
+  // 5. Quality signals
+  let qualityBoost = 0;
+  if (post.caption && post.caption.trim().length > 30) {
+    qualityBoost += 6; // Thoughtful caption / travel story
+  }
+  if (post.imageUrl && (post.imageUrl.startsWith('http') || post.imageUrl.startsWith('/uploads'))) {
+    qualityBoost += 5;
+  }
+
+  // 6. User personal affinity
+  let affinityBoost = 0;
+  if (currentUserId && post.userId === currentUserId) {
+    affinityBoost = 10; // Creator boost for user's own contributions
+  }
+
+  // Engagement score scaled by gravity decay
+  const engagementComp = engagementScore * 12 * gravityDecay;
+  const finalScore = engagementComp + freshnessBoost + proximityBoost + qualityBoost + affinityBoost;
+
+  // Determine if trending (high engagement velocity)
+  const isTrending = engagementComp > 18 || (likesCount >= 10 && ageHours <= 48);
+
+  return {
+    score: Math.round(finalScore * 10) / 10,
+    isTrending,
+    isNearby,
+    isFresh,
+    distKm: distKm ? Math.round(distKm) : null,
+  };
+}
+
+/**
+ * Apply Anti-Monopoly Content Diversity Re-ranking:
+ * Prevents 3+ consecutive posts from the exact same monument placeId so the feed
+ * displays a colorful, diverse tapestry of Indian heritage sites.
+ */
+function applyDiversityRerank(rankedPosts) {
+  if (rankedPosts.length <= 2) return rankedPosts;
+  const diversified = [];
+  const pool = [...rankedPosts];
+
+  while (pool.length > 0) {
+    let pickIndex = 0;
+    const lastPlaceId = diversified.length > 0 ? diversified[diversified.length - 1].placeId : null;
+    const secondLastPlaceId = diversified.length > 1 ? diversified[diversified.length - 2].placeId : null;
+
+    // If the top candidate is the same place as the last 2 posts, look ahead for a different place
+    if (lastPlaceId && secondLastPlaceId && lastPlaceId === secondLastPlaceId) {
+      const altIndex = pool.findIndex((p) => p.placeId !== lastPlaceId);
+      if (altIndex !== -1 && altIndex < 6) {
+        pickIndex = altIndex;
+      }
+    } else if (lastPlaceId) {
+      // If same as immediate last post, see if there's a closely-ranked alternative within top 3
+      if (pool[0].placeId === lastPlaceId && pool.length > 1) {
+        const altIndex = pool.findIndex((p) => p.placeId !== lastPlaceId);
+        if (altIndex !== -1 && altIndex <= 2) {
+          pickIndex = altIndex;
+        }
+      }
+    }
+
+    diversified.push(pool.splice(pickIndex, 1)[0]);
+  }
+
+  return diversified;
 }
 
 export async function getFeedPosts(req, res) {
   try {
+    const userLat = req.query.lat ? parseFloat(req.query.lat) : null;
+    const userLng = req.query.lng ? parseFloat(req.query.lng) : null;
+    const userCity = req.query.city ? String(req.query.city).trim() : null;
+
     const posts = await prisma.post.findMany({
       where: { isApproved: true },
       include: {
         user: { select: { id: true, name: true, avatarUrl: true } },
-        place: { select: { id: true, name: true, slug: true, category: true, state: true } },
+        place: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            category: true,
+            state: true,
+            latitude: true,
+            longitude: true,
+          },
+        },
         comments: {
           orderBy: { createdAt: 'asc' },
           take: 30,
@@ -86,17 +309,23 @@ export async function getFeedPosts(req, res) {
           select: { userId: true, ipAddress: true },
         },
       },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
+      take: 100, // expanded pool for algorithmic ranking
     });
 
     const currentUserId = req.user?.id || null;
     const clientIp = req.ip || req.headers['x-forwarded-for'] || '';
 
-    const formatted = posts.map((p) => {
+    const scoredPosts = posts.map((p) => {
       const hasLiked = currentUserId
         ? p.likes.some((l) => l.userId === currentUserId)
         : p.likes.some((l) => l.ipAddress === clientIp);
+
+      const algo = calculateFeedPostScore(p, {
+        userLat,
+        userLng,
+        userCity,
+        currentUserId,
+      });
 
       return {
         ...p,
@@ -110,10 +339,26 @@ export async function getFeedPosts(req, res) {
           timeAgo: formatTimeAgo(c.createdAt),
           createdAt: c.createdAt,
         })),
+        _algoScore: algo.score,
+        isTrending: algo.isTrending,
+        isNearby: algo.isNearby,
+        isFresh: algo.isFresh,
+        distKm: algo.distKm,
       };
     });
 
-    return res.json({ success: true, posts: formatted });
+    // 1. Sort by algorithmic recommendation score descending
+    scoredPosts.sort((a, b) => b._algoScore - a._algoScore);
+
+    // 2. Apply diversity re-ranking to prevent repetitive monuments
+    const finalFeed = applyDiversityRerank(scoredPosts);
+
+    return res.json({
+      success: true,
+      count: finalFeed.length,
+      posts: finalFeed,
+      algorithm: 'sanskriti_edgerank_v2',
+    });
   } catch (error) {
     console.error('getFeedPosts error:', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch community posts.' });

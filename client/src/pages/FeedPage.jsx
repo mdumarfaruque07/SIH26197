@@ -144,9 +144,18 @@ export default function FeedPage({ onOpenPostModal }) {
     }
   };
 
-  const fetchCommunityPosts = async () => {
+  const fetchCommunityPosts = async (coords = null) => {
     try {
-      const res = await postService.getFeed();
+      const activeCoords = coords || userLocation;
+      const params = {};
+      if (activeCoords?.lat && activeCoords?.lng) {
+        params.lat = activeCoords.lat;
+        params.lng = activeCoords.lng;
+      }
+      if (activeCoords?.city) {
+        params.city = activeCoords.city;
+      }
+      const res = await postService.getFeed(params);
       if (res.success && res.posts?.length > 0) {
         setFeedPosts(res.posts);
         setLocalCachedData('feedPosts', res.posts);
@@ -192,7 +201,7 @@ export default function FeedPage({ onOpenPostModal }) {
 
     try {
       const loc = await getLiveLocation();
-      const coords = { lat: loc.lat, lng: loc.lng };
+      const coords = { lat: loc.lat, lng: loc.lng, city: loc.city || '' };
       setUserLocation(coords);
       if (loc.city) {
         setLocationStatus(lang === 'hi' ? `${loc.city} के निकट धरोहर स्थल` : `Heritage sites near ${loc.city}`);
@@ -200,6 +209,7 @@ export default function FeedPage({ onOpenPostModal }) {
         setLocationStatus(lang === 'hi' ? 'आपकी लोकेशन के अनुसार धरोहर स्थल' : 'Heritage sites sorted by proximity');
       }
       fetchPlaces(coords.lat, coords.lng);
+      fetchCommunityPosts(coords);
     } catch (err) {
       console.warn('Geolocation resolver notice:', err);
       setLocationStatus('');
@@ -244,75 +254,8 @@ export default function FeedPage({ onOpenPostModal }) {
 
   return (
     <div className="min-h-screen pb-16">
-      {/* 1. Hero Banner Section with Search & Geolocation */}
-      <section className="relative overflow-hidden bg-stone-900 text-white pt-8 pb-10 sm:pb-12 px-4 sm:px-6 lg:px-8">
-        <div className="absolute inset-0 opacity-25">
-          <img
-            src="https://images.unsplash.com/photo-1548013146-72479768bada?auto=format&fit=crop&w=1800&q=80"
-            alt="Indian Heritage"
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-900/80 to-transparent" />
-        </div>
-
-        <div className="relative max-w-5xl mx-auto text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-heritage-500/20 border border-heritage-500/30 text-heritage-300 text-xs font-semibold backdrop-blur-md">
-            <Sparkles className="w-3.5 h-3.5 text-heritage-400" />
-            <span>National Heritage & Culture Portal</span>
-          </div>
-
-          <h1 className="font-serif text-3xl sm:text-5xl font-extrabold tracking-tight leading-tight">
-            Discover India’s Living <span className="text-heritage-400 underline decoration-heritage-500/50">Heritage</span>
-          </h1>
-
-          <p className="max-w-2xl mx-auto text-stone-300 text-xs sm:text-sm font-light leading-relaxed">
-            Real visitor photos, reviews, cultural stories & interactive monuments powered by live geolocation.
-          </p>
-
-          {/* Action Row: Locate Me & Search */}
-          <div className="max-w-2xl mx-auto pt-1 flex flex-col sm:flex-row items-center gap-3">
-            <button
-              onClick={requestGeolocation}
-              disabled={locating}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-heritage-600 hover:bg-heritage-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-heritage-600/30 transition-all hover:scale-105 active:scale-95"
-            >
-              {locating ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
-              ) : (
-                <Compass className="w-4 h-4 text-heritage-200" />
-              )}
-              <span>{userLocation ? 'Update Near Me Feed' : 'Find Heritage Near Me'}</span>
-            </button>
-
-            {/* Search Input */}
-            <form onSubmit={handleSearchSubmit} className="w-full flex-1 relative">
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={
-                  activeTab === 'feed'
-                    ? (lang === 'hi' ? 'समीक्षाएं, यात्री या स्मारक खोजें...' : 'Search visitor reviews, stories or places...')
-                    : (lang === 'hi' ? 'स्मारक, मंदिर, राज्य खोजें...' : 'Search monuments, temples, states...')
-                }
-                className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/15 focus:bg-white/20 border border-white/20 text-white placeholder-stone-400 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-heritage-400 backdrop-blur-md transition-all"
-              />
-              <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-3" />
-            </form>
-          </div>
-
-          {locationStatus && (
-            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-[11px] text-heritage-200 font-medium">
-              <MapPin className="w-3 h-3 text-heritage-400" />
-              <span>{locationStatus}</span>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* 2. Main Container with Instagram Stories & View Switcher */}
-      <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-5 space-y-6">
-
+      {/* Main Container with Instagram Stories & View Switcher */}
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-2 sm:pt-4 space-y-4 sm:space-y-6">
         {/* Instagram Heritage Story Reels (Horizontal Avatar Rings) */}
         <InstagramStoryBar onOpenPostModal={() => onOpenPostModal && onOpenPostModal()} />
 

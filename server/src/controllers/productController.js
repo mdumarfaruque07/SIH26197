@@ -31,11 +31,26 @@ export async function getAllProducts(req, res) {
             slug: true,
           },
         },
+        reviews: {
+          orderBy: { createdAt: 'desc' },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    return res.json({ success: true, count: products.length, products });
+    const enriched = products.map((p) => {
+      const revs = p.reviews || [];
+      const avgRating = revs.length > 0
+        ? parseFloat((revs.reduce((acc, r) => acc + r.rating, 0) / revs.length).toFixed(1))
+        : (p.rating || 4.8);
+      return {
+        ...p,
+        rating: avgRating,
+        reviewCount: revs.length,
+      };
+    });
+
+    return res.json({ success: true, count: enriched.length, products: enriched });
   } catch (error) {
     console.error('getAllProducts error:', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch products' });
@@ -69,6 +84,9 @@ export async function getProductById(req, res) {
       where: { id },
       include: {
         place: true,
+        reviews: {
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
 
@@ -76,7 +94,19 @@ export async function getProductById(req, res) {
       return res.status(400).json({ success: false, message: 'Product not found' });
     }
 
-    return res.json({ success: true, product });
+    const revs = product.reviews || [];
+    const avgRating = revs.length > 0
+      ? parseFloat((revs.reduce((acc, r) => acc + r.rating, 0) / revs.length).toFixed(1))
+      : (product.rating || 4.8);
+
+    return res.json({
+      success: true,
+      product: {
+        ...product,
+        rating: avgRating,
+        reviewCount: revs.length,
+      },
+    });
   } catch (error) {
     console.error('getProductById error:', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch product' });
@@ -172,5 +202,64 @@ export async function createProduct(req, res) {
       message: 'Failed to create product',
       error: error.message,
     });
+  }
+}
+
+export async function createProductReview(req, res) {
+  try {
+    const productId = parseInt(req.params.id);
+    const { userName, userCity, rating, comment } = req.body;
+
+    if (!userName || !rating || !comment) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name, rating, and review text are required.',
+      });
+    }
+
+    const review = await prisma.productReview.create({
+      data: {
+        productId,
+        userName,
+        userCity: userCity || 'Verified Heritage Traveler',
+        rating: parseInt(rating),
+        comment,
+        verifiedBuy: true,
+      },
+    });
+
+    // Recompute product rating
+    const allReviews = await prisma.productReview.findMany({ where: { productId } });
+    const avg = parseFloat((allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length).toFixed(1));
+    await prisma.product.update({
+      where: { id: productId },
+      data: { rating: avg },
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Review submitted successfully!',
+      review,
+      newRating: avg,
+      reviewCount: allReviews.length,
+    });
+  } catch (error) {
+    console.error('createProductReview error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to submit review' });
+  }
+}
+
+export async function getProductReviews(req, res) {
+  try {
+    const productId = parseInt(req.params.id);
+    const reviews = await prisma.productReview.findMany({
+      where: { productId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return res.json({ success: true, count: reviews.length, reviews });
+  } catch (error) {
+    console.error('getProductReviews error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch reviews' });
   }
 }

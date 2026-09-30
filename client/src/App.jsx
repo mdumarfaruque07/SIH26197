@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
+import { CartProvider } from './context/CartContext';
 import Navbar from './components/Navbar';
 import FeedPage from './pages/FeedPage';
 import MapPage from './pages/MapPage';
 import PlaceDetailPage from './pages/PlaceDetailPage';
 import BookmarksPage from './pages/BookmarksPage';
 import BazaarPage from './pages/BazaarPage';
+import CartPage from './pages/CartPage';
 import ArtisanPortalPage from './pages/ArtisanPortalPage';
 import ProfilePage from './pages/ProfilePage';
 import AdminPage from './pages/AdminPage';
@@ -72,12 +74,20 @@ function AppContent() {
             }
           />
           <Route path="/bazaar" element={<BazaarPage />} />
+          <Route path="/bazaar/*" element={<BazaarPage />} />
+          <Route path="/cart" element={<CartPage />} />
+          <Route path="/odop" element={<BazaarPage />} />
+          <Route path="/artisan" element={<ArtisanPortalPage />} />
           <Route path="/artisan-portal" element={<ArtisanPortalPage />} />
+          <Route path="/artisan-portal/*" element={<ArtisanPortalPage />} />
+          <Route path="/feed" element={<FeedPage onOpenPostModal={handleOpenPostModal} />} />
           <Route path="/bookmarks" element={<BookmarksPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          {/* Universal Catch-all route to prevent blank white page on undefined URLs */}
+          <Route path="*" element={<FeedPage onOpenPostModal={handleOpenPostModal} />} />
         </Routes>
       </main>
 
@@ -137,14 +147,70 @@ function AppContent() {
   );
 }
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('SanskritiKhoj Global UI Caught Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#fdfbf7] flex items-center justify-center p-6 text-center">
+          <div className="max-w-md w-full bg-white p-8 rounded-3xl shadow-xl border border-stone-200 space-y-4">
+            <div className="w-16 h-16 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center mx-auto text-2xl font-bold">
+              🏛️
+            </div>
+            <h2 className="font-serif text-xl font-bold text-stone-900">
+              SanskritiKhoj Heritage Portal
+            </h2>
+            <p className="text-xs text-stone-600 leading-relaxed">
+              An unexpected display issue occurred while rendering this page. You can return to the home feed or refresh.
+            </p>
+            <div className="pt-2 flex items-center justify-center gap-3">
+              <button
+                onClick={() => {
+                  window.location.href = '/';
+                }}
+                className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold shadow-md shadow-orange-600/30 transition-all cursor-pointer"
+              >
+                Go to Home Feed
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-bold transition-all cursor-pointer"
+              >
+                Refresh Page
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   return (
-    <LanguageProvider>
-      <AuthProvider>
-        <BrowserRouter>
-          <AppContent />
-        </BrowserRouter>
-      </AuthProvider>
-    </LanguageProvider>
+    <ErrorBoundary>
+      <LanguageProvider>
+        <AuthProvider>
+          <CartProvider>
+            <BrowserRouter>
+              <AppContent />
+            </BrowserRouter>
+          </CartProvider>
+        </AuthProvider>
+      </LanguageProvider>
+    </ErrorBoundary>
   );
 }

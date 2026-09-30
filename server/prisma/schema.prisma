@@ -149,7 +149,9 @@ model Product {
   shopTiming   String?  @map("shop_timing")
   phone        String?
   whatsapp     String?
+  listingFeePaid Boolean @default(true) @map("listing_fee_paid")
   createdAt    DateTime @default(now()) @map("created_at")
+  reviews      ProductReview[]
 
   @@map("products")
 }
@@ -220,4 +222,45 @@ model SupportTicket {
   createdAt          DateTime @default(now()) @map("created_at")
 
   @@map("support_tickets")
+}
+
+model Order {
+  id            String   @id // e.g. 'ODOP-2026-784192'
+  productId     Int?     @map("product_id")
+  productName   String   @map("product_name")
+  productImage  String?  @db.Text @map("product_image")
+  price         Float
+  quantity      Int      @default(1)
+  buyerFee      Float    @default(29.0) @map("buyer_fee")
+  artisanShare  Float    @map("artisan_share")
+  platformFee   Float    @map("platform_fee")
+  artisanName   String   @map("artisan_name")
+  buyerName     String   @map("buyer_name")
+  buyerPhone    String   @map("buyer_phone")
+  buyerAddress  String   @db.Text @map("buyer_address")
+  buyerCity     String   @map("buyer_city")
+  paymentMethod String   @default("UPI Escrow Direct") @map("payment_method")
+  utr           String?
+  status        String   @default("order_placed") // 'order_placed', 'crafting', 'dispatched', 'delivered'
+  carrier       String   @default("India Post SpeedPost (GI Secure)")
+  trackingAwb   String?  @map("tracking_awb")
+  artisanNote   String?  @db.Text @map("artisan_note")
+  timelineJson  String?  @db.Text @map("timeline_json")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("orders")
+}
+
+model ProductReview {
+  id          Int      @id @default(autoincrement())
+  productId   Int      @map("product_id")
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userName    String   @map("user_name")
+  userCity    String?  @map("user_city")
+  rating      Int      @default(5)
+  comment     String   @db.Text
+  verifiedBuy Boolean  @default(true) @map("verified_buy")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("product_reviews")
 }

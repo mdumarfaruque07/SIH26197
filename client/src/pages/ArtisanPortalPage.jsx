@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { placeService, productService, artisanVerificationService } from '../services/api';
+import { placeService, productService, artisanVerificationService, orderService } from '../services/api';
 import {
   Store,
   Sparkles,
@@ -41,9 +41,18 @@ import {
   User,
   CheckCircle,
   Building,
+  Truck,
+  Package,
+  CreditCard,
+  Coins,
 } from 'lucide-react';
 import { Camera as CameraPlugin, CameraResultType, CameraSource } from '@capacitor/camera';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
+import PaymentGatewayModal from '../components/PaymentGatewayModal';
+import { PrintableStandeePortal } from '../components/PrintableStandee';
+import { PrintableShippingSlipPortal } from '../components/PrintableShippingLabel';
+import { triggerPrint } from '../utils/printUtils';
 
 // Official National Handicrafts & GI Registry Database (DC Handicrafts & Ministry of Textiles)
 export const NATIONAL_HANDICRAFTS_REGISTRY = {
@@ -253,23 +262,21 @@ const PRESET_IMAGE_TEMPLATES = [
 
 export default function ArtisanPortalPage() {
   const { lang } = useLanguage();
+  const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
 
   const [places, setPlaces] = useState([]);
   const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('add'); // 'add' | 'my-products' | 'subscription' | 'guidelines'
-  const [activePlan, setActivePlan] = useState('gold'); // 'silver' | 'gold' | 'platinum'
-  const [billingCycle, setBillingCycle] = useState('monthly'); // 'monthly' | 'annual'
-  const [selectedPlan, setSelectedPlan] = useState('gold');
-  const [showPlanModal, setShowPlanModal] = useState(false);
-  const [planModalTarget, setPlanModalTarget] = useState(null);
-  const [planPaymentMethod, setPlanPaymentMethod] = useState('upi'); // 'upi' | 'card' | 'netbanking'
-  const [isProcessingPlan, setIsProcessingPlan] = useState(false);
-  const [subscriptionSuccess, setSubscriptionSuccess] = useState(null);
+  const [activeTab, setActiveTab] = useState('add'); // 'add' | 'my-products' | 'orders' | 'fee-policy' | 'guidelines'
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [listingFeePaid, setListingFeePaid] = useState(true); // Free Listing & 0% Commission Promo
+  const [showListingPaymentModal, setShowListingPaymentModal] = useState(false);
+  const [listingPaymentUtr, setListingPaymentUtr] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [successProduct, setSuccessProduct] = useState(null);
   const [validationError, setValidationError] = useState('');
+  const [orderToPrint, setOrderToPrint] = useState(null);
 
   // Admin Approval & Onboarding Verification State
   const [allApplications, setAllApplications] = useState([]);
@@ -358,7 +365,6 @@ export default function ArtisanPortalPage() {
       if (matched) {
         setCurrentApp(matched);
         setApprovalStatus(matched.status);
-        setActivePlan(matched.activePlan || null);
         setSelectedProfilePehchan(matched.pehchanId);
         setFormData((prev) => ({
           ...prev,
@@ -377,6 +383,12 @@ export default function ArtisanPortalPage() {
           placeId: String(matched.placeId || '1'),
         }));
         checkRegistry(matched.pehchanId, false);
+        try {
+          const orderList = await orderService.getArtisanOrders(matched?.artisanName || 'Ustad Rashid');
+          setOrders(orderList || []);
+        } catch (err) {
+          console.warn('Could not load orders:', err);
+        }
       }
     } catch (e) {
       console.error(e);
@@ -388,6 +400,38 @@ export default function ArtisanPortalPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleUpdateOrderStatus = async (orderId, newStatus) => {
+    setUpdatingOrderId(orderId);
+    try {
+      const awb = newStatus === 'dispatched' ? `IN-POST-SPEED-${Math.floor(100000 + Math.random() * 900000)}` : null;
+      await orderService.updateStatus(orderId, newStatus, awb);
+      const artisanName = currentApp?.artisanName || formData.artisanName || 'Ustad Rashid';
+      const updated = await orderService.getArtisanOrders(artisanName);
+      setOrders(updated || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setUpdatingOrderId(null);
+    }
+  };
+
+  const handlePrintOrderSlip = (order) => {
+    setOrderToPrint(order);
+    setTimeout(() => {
+      triggerPrint('printing-shipping-slip', () => {
+        setOrderToPrint(null);
+      });
+    }, 60);
+  };
+
+  const handlePrintStandee = () => {
+    triggerPrint('printing-standee');
+  };
+
+  const handleSimulateListingFeePayment = () => {
+    setListingFeePaid(true);
+  };
 
   const handleSwitchProfile = async (pehchanId) => {
     if (pehchanId === 'NEW') {
@@ -409,7 +453,7 @@ export default function ArtisanPortalPage() {
     if (res.success) {
       setApprovalStatus('APPROVED');
       setCurrentApp((prev) => ({ ...prev, status: 'APPROVED' }));
-      setActiveTab('subscription');
+      setActiveTab('orders');
     }
   };
 
@@ -874,9 +918,8 @@ export default function ArtisanPortalPage() {
             </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto">
-              <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${
-                approvalStatus === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-              }`}>
+              <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${approvalStatus === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                }`}>
                 {approvalStatus === 'APPROVED' ? '✓ Verified Guild' : '⏱ Verification Pending'}
               </span>
 
@@ -990,138 +1033,85 @@ export default function ArtisanPortalPage() {
           </div>
         )}
 
-        {/* BANNER 2: APPROVED BUT NO SUBSCRIPTION PLAN CHOSEN YET */}
-        {approvalStatus === 'APPROVED' && !activePlan && (
-          <div className="p-5 rounded-3xl bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-2 border-emerald-400 shadow-sm space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-600/20">
-                  <BadgeCheck className="w-6 h-6" />
-                </div>
-                <div>
-                  <h4 className="font-serif font-bold text-stone-900 text-base">
-                    Shop Verified by Tourism Admin! Next Step: Choose a Subscription Plan
-                  </h4>
-                  <p className="text-xs text-stone-600">
-                    Aapki dukan approve ho chuki hai. ODOP Bazaar me apne crafts list karne ke liye kripya apna Listing Plan select karein.
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('subscription')}
-                className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold shadow-md shadow-orange-600/20 transition-all flex items-center gap-1.5 self-start sm:self-auto"
-              >
-                <span>Choose Subscription Plan</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Navigation Tabs */}
         <div className="bg-white p-2 rounded-2xl shadow-lg border border-stone-200 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
           <button
             onClick={() => {
               if (approvalStatus === 'PENDING') {
-                alert('Admin Approval Required: Your workshop is currently under review by Government Administration. Subscription and item listing will unlock once approved.');
-                return;
-              }
-              if (approvalStatus === 'APPROVED' && !activePlan) {
-                alert('Step 2 Required: Your workshop is approved! Please choose an active Subscription Plan first to unlock product listing.');
-                setActiveTab('subscription');
+                alert('Admin Approval Required: Your workshop is currently under review by Government Administration. Craft listing will unlock once approved.');
                 return;
               }
               setActiveTab('add');
             }}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-              activeTab === 'add'
-                ? 'bg-orange-600 text-white shadow-md shadow-orange-600/20'
-                : 'text-stone-600 hover:bg-stone-100'
-            } ${approvalStatus === 'PENDING' || (approvalStatus === 'APPROVED' && !activePlan) ? 'opacity-70' : ''}`}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${activeTab === 'add'
+              ? 'bg-orange-600 text-white shadow-md shadow-orange-600/20'
+              : 'text-stone-600 hover:bg-stone-100'
+              } ${approvalStatus === 'PENDING' ? 'opacity-70' : ''}`}
           >
-            {approvalStatus === 'PENDING' || (approvalStatus === 'APPROVED' && !activePlan) ? (
+            {approvalStatus === 'PENDING' ? (
               <Lock className="w-4 h-4 text-stone-400" />
             ) : (
               <PlusCircle className="w-4 h-4" />
             )}
-            <span>List New Craft & Workshop</span>
+            <span>List New Craft</span>
             {approvalStatus === 'PENDING' && (
               <span className="px-1.5 py-0.5 rounded text-[9px] bg-amber-100 text-amber-800 font-bold uppercase">
                 Locked
-              </span>
-            )}
-            {approvalStatus === 'APPROVED' && !activePlan && (
-              <span className="px-1.5 py-0.5 rounded text-[9px] bg-stone-100 text-stone-600 font-bold uppercase">
-                Pick Plan First
               </span>
             )}
           </button>
 
           <button
             onClick={() => setActiveTab('my-products')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-              activeTab === 'my-products'
-                ? 'bg-orange-600 text-white shadow-md shadow-orange-600/20'
-                : 'text-stone-600 hover:bg-stone-100'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${activeTab === 'my-products'
+              ? 'bg-orange-600 text-white shadow-md shadow-orange-600/20'
+              : 'text-stone-600 hover:bg-stone-100'
+              }`}
           >
             <ShoppingBag className="w-4 h-4" />
-            <span>My Listed Shops & Crafts ({products.length})</span>
+            <span>My Listed Crafts ({products.length})</span>
           </button>
 
           <button
-            onClick={() => {
-              if (approvalStatus === 'PENDING') {
-                alert('Admin Approval Required: Your workshop is currently under review by Government Administration. Subscription plans will unlock once approved.');
-                return;
-              }
-              setActiveTab('subscription');
-            }}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-              activeTab === 'subscription'
-                ? 'bg-orange-600 text-white shadow-md shadow-orange-600/20'
-                : 'text-stone-600 hover:bg-stone-100'
-            } ${approvalStatus === 'PENDING' ? 'opacity-70' : ''}`}
+            onClick={() => setActiveTab('orders')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${activeTab === 'orders'
+              ? 'bg-orange-600 text-white shadow-md shadow-orange-600/20'
+              : 'text-stone-600 hover:bg-stone-100'
+              }`}
           >
-            {approvalStatus === 'PENDING' ? (
-              <Lock className="w-4 h-4 text-stone-400" />
-            ) : (
-              <Store className="w-4 h-4" />
-            )}
-            <span>Shop Subscription & Listing Plans</span>
-            {approvalStatus === 'APPROVED' && activePlan && (
-              <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-emerald-100 text-emerald-800 font-extrabold uppercase">
-                Active
+            <Truck className="w-4 h-4" />
+            <span>Customer Orders & Dispatch</span>
+            {orders.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-100 text-emerald-800 font-mono font-bold">
+                {orders.length}
               </span>
             )}
-            {approvalStatus === 'APPROVED' && !activePlan && (
-              <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-orange-100 text-orange-800 font-extrabold uppercase">
-                Select Plan
-              </span>
-            )}
-            {approvalStatus === 'PENDING' && (
-              <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-amber-100 text-amber-800 font-extrabold uppercase">
-                Locked
-              </span>
-            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('fee-policy')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${activeTab === 'fee-policy'
+              ? 'bg-orange-600 text-white shadow-md shadow-orange-600/20'
+              : 'text-stone-600 hover:bg-stone-100'
+              }`}
+          >
+            <Coins className="w-4 h-4" />
+            <span>Fair-Trade Fee Policy (100% Payout / 0% Commission)</span>
           </button>
 
           <button
             onClick={() => setActiveTab('guidelines')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-              activeTab === 'guidelines'
-                ? 'bg-orange-600 text-white shadow-md shadow-orange-600/20'
-                : 'text-stone-600 hover:bg-stone-100'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${activeTab === 'guidelines'
+              ? 'bg-orange-600 text-white shadow-md shadow-orange-600/20'
+              : 'text-stone-600 hover:bg-stone-100'
+              }`}
           >
             <ShieldCheck className="w-4 h-4" />
-            <span>Govt Verification & Zero-Scam Shield</span>
+            <span>Govt Verification & Shield</span>
           </button>
         </div>
 
-        {/* TAB 1: ADD PRODUCT FORM (LOCKED IF PENDING OR NO PLAN) */}
+        {/* TAB 1: ADD PRODUCT FORM (LOCKED IF PENDING) */}
         {activeTab === 'add' && approvalStatus === 'PENDING' && (
           <div className="bg-white rounded-3xl p-8 sm:p-12 border border-stone-200 shadow-sm text-center space-y-4">
             <div className="w-16 h-16 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto border border-amber-300">
@@ -1144,35 +1134,8 @@ export default function ArtisanPortalPage() {
           </div>
         )}
 
-        {/* TAB 1: ADD PRODUCT FORM (UNLOCKED ONLY WHEN APPROVED AND PLAN SELECTED) */}
-        {activeTab === 'add' && approvalStatus === 'APPROVED' && !activePlan && (
-          <div className="bg-white rounded-3xl p-8 sm:p-12 border border-stone-200 shadow-sm text-center space-y-4">
-            <div className="w-16 h-16 rounded-2xl bg-orange-100 text-orange-700 flex items-center justify-center mx-auto border border-orange-300">
-              <Store className="w-8 h-8" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="font-serif text-xl sm:text-2xl font-bold text-stone-900">
-                Workshop Approved! Please Choose a Listing Plan
-              </h3>
-              <p className="text-xs text-stone-500 max-w-md mx-auto leading-relaxed">
-                Your credentials are authenticated by Government Administration. Select a monthly or annual listing plan to activate your turn-by-turn shop navigation and publish your craft items.
-              </p>
-            </div>
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={() => setActiveTab('subscription')}
-                className="px-6 py-3 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold shadow-md transition-all active:scale-95 inline-flex items-center gap-2"
-              >
-                <span>Select Subscription Plan</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 1: ADD PRODUCT FORM (FULLY ACTIVE WHEN APPROVED AND PLAN IS ACTIVE) */}
-        {activeTab === 'add' && approvalStatus === 'APPROVED' && activePlan && (
+        {/* TAB 1: ADD PRODUCT FORM (FULLY ACTIVE WHEN APPROVED) */}
+        {activeTab === 'add' && approvalStatus === 'APPROVED' && (
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200 shadow-sm space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-stone-100 gap-2">
               <div>
@@ -1190,14 +1153,16 @@ export default function ArtisanPortalPage() {
               </div>
 
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowRegistryLookupModal(true)}
-                  className="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-200 transition-colors flex items-center gap-1.5"
-                >
-                  <Search className="w-3.5 h-3.5" />
-                  <span>Check Registered Guilds</span>
-                </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setShowRegistryLookupModal(true)}
+                    className="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Search className="w-3.5 h-3.5" />
+                    <span>Check Registered Guilds (Admin)</span>
+                  </button>
+                )}
 
                 <Link
                   to="/bazaar"
@@ -1393,13 +1358,12 @@ export default function ArtisanPortalPage() {
                       placeholder="e.g. UP-AGR-44910 or UP-VAR-10842"
                       value={formData.pehchanId}
                       onChange={handlePehchanChange}
-                      className={`w-full px-3 py-2 rounded-xl bg-black/40 border text-xs font-mono placeholder:text-stone-500 focus:outline-none focus:ring-1 ${
-                        registryStatus === 'verified'
-                          ? 'border-emerald-400/60 text-emerald-300 focus:ring-emerald-400'
-                          : registryStatus === 'not_found'
+                      className={`w-full px-3 py-2 rounded-xl bg-black/40 border text-xs font-mono placeholder:text-stone-500 focus:outline-none focus:ring-1 ${registryStatus === 'verified'
+                        ? 'border-emerald-400/60 text-emerald-300 focus:ring-emerald-400'
+                        : registryStatus === 'not_found'
                           ? 'border-red-400/80 text-red-300 focus:ring-red-400'
                           : 'border-emerald-500/30 text-white focus:ring-emerald-400'
-                      }`}
+                        }`}
                     />
 
                     {/* Live Feedback helper text based on user input */}
@@ -1687,11 +1651,10 @@ export default function ArtisanPortalPage() {
                     <button
                       type="button"
                       onClick={() => setImageUploadMode('gallery')}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
-                        imageUploadMode === 'gallery'
-                          ? 'bg-orange-600 text-white shadow-2xs'
-                          : 'text-stone-600 hover:text-stone-900'
-                      }`}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${imageUploadMode === 'gallery'
+                        ? 'bg-orange-600 text-white shadow-2xs'
+                        : 'text-stone-600 hover:text-stone-900'
+                        }`}
                     >
                       <FolderOpen className="w-3.5 h-3.5" />
                       <span>Gallery / Storage</span>
@@ -1700,11 +1663,10 @@ export default function ArtisanPortalPage() {
                     <button
                       type="button"
                       onClick={() => setImageUploadMode('camera')}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
-                        imageUploadMode === 'camera'
-                          ? 'bg-orange-600 text-white shadow-2xs'
-                          : 'text-stone-600 hover:text-stone-900'
-                      }`}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${imageUploadMode === 'camera'
+                        ? 'bg-orange-600 text-white shadow-2xs'
+                        : 'text-stone-600 hover:text-stone-900'
+                        }`}
                     >
                       <Camera className="w-3.5 h-3.5" />
                       <span>Camera</span>
@@ -1713,11 +1675,10 @@ export default function ArtisanPortalPage() {
                     <button
                       type="button"
                       onClick={() => setImageUploadMode('url')}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
-                        imageUploadMode === 'url'
-                          ? 'bg-orange-600 text-white shadow-2xs'
-                          : 'text-stone-600 hover:text-stone-900'
-                      }`}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${imageUploadMode === 'url'
+                        ? 'bg-orange-600 text-white shadow-2xs'
+                        : 'text-stone-600 hover:text-stone-900'
+                        }`}
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                       <span>Web Link</span>
@@ -1878,6 +1839,39 @@ export default function ArtisanPortalPage() {
                 />
               </div>
 
+              {/* One-Time Fair-Trade Listing Fee Card */}
+              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-300 space-y-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shrink-0">
+                      <ShieldCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-serif font-bold text-xs text-stone-900 leading-tight">
+                        Direct Artisan Fair-Trade Listing (0% Commission Promo)
+                      </h4>
+                      <p className="text-[10px] text-emerald-800 font-semibold">
+                        Zero Monthly Fees • 100% Direct Payout to Verified Artisan Bank Account
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <span className="font-mono text-xs font-extrabold text-emerald-950 bg-emerald-50 border border-emerald-300 px-3 py-1 rounded-xl">
+                      ₹0 Free Promo
+                    </span>
+                    <span className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white flex items-center gap-1.5 shadow-sm">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>✓ 100% Free Listing Approved</span>
+                    </span>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-stone-600 leading-relaxed">
+                  Under the direct Fair-Trade Policy, you keep <strong>100% of every craft sale</strong> directly in your verified bank account. All platform fees, listing charges, and commissions are currently <strong>₹0 (100% FREE)</strong>.
+                </p>
+              </div>
+
               <div className="pt-3 border-t border-stone-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-1.5 text-[11px] text-stone-600">
                   <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -1887,13 +1881,13 @@ export default function ArtisanPortalPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold shadow-lg shadow-orange-600/30 transition-all active:scale-95 disabled:opacity-50 w-full sm:w-auto justify-center"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold shadow-lg shadow-orange-600/30 transition-all active:scale-95 disabled:opacity-50 w-full sm:w-auto justify-center cursor-pointer"
                 >
                   {submitting ? (
                     <span>Verifying Credentials & Publishing...</span>
                   ) : (
                     <>
-                      <span>Submit for Verification & Publish</span>
+                      <span>Publish Craft Listing (0% Commission)</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
@@ -2009,503 +2003,478 @@ export default function ArtisanPortalPage() {
           </div>
         )}
 
-        {/* TAB 3: SHOP SUBSCRIPTION & LISTING PLANS */}
-        {activeTab === 'subscription' && (
+        {/* TAB 3: CUSTOMER ORDERS & STUDIO DISPATCH */}
+        {activeTab === 'orders' && (
           <div className="space-y-6">
-            {/* Header with Protection Guarantee */}
             <div className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200 shadow-sm space-y-4">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-stone-100">
                 <div>
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-bold mb-2">
-                    <Store className="w-3.5 h-3.5 text-amber-700" />
-                    <span>Physical Workshop Discovery & Direct Tourist Sales</span>
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 text-xs font-bold mb-2">
+                    <Package className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>{lang === 'hi' ? 'लाइव ग्राहक ऑर्डर एवं स्टूडियो डिस्पैच' : 'Live Customer Orders & Studio Dispatch'}</span>
                   </div>
                   <h3 className="font-serif text-2xl sm:text-3xl font-bold text-stone-900">
-                    Shop Subscription & Listing Plans
+                    {lang === 'hi' ? 'कारीगर ऑर्डर प्रबंधन' : 'Artisan Order Fulfillment Hub'}
                   </h3>
                   <p className="text-xs sm:text-sm text-stone-500 mt-1 max-w-2xl leading-relaxed">
-                    Connect your physical workshop directly with tourists visiting nearby monuments. Keep 100% of customer payments directly at counter. Zero courier fraud, zero transit damage, and transparent monthly listing fee.
+                    {lang === 'hi'
+                      ? 'ऑनलाइन खरीदारों से आने वाले ऑर्डर्स को पैक और डिस्पैच करें। हर ऑर्डर पर 100% सीधी कमाई आपके बैंक खाते में।'
+                      : 'Fulfill direct courier orders from tourists and patrons across India. Guaranteed 100% direct payout remitted to your bank account.'}
                   </p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                    <span>0% Sales Commission</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-orange-50 text-orange-800 border border-orange-200 text-xs font-bold">
-                    <CheckCircle2 className="w-4 h-4 text-orange-600" />
-                    <span>Zero Delivery Fraud</span>
-                  </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      const name = currentApp?.artisanName || formData.artisanName || 'Ustad Rashid';
+                      orderService.getArtisanOrders(name).then((res) => setOrders(res || []));
+                    }}
+                    className="px-4 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-stone-600" />
+                    <span>{lang === 'hi' ? 'रीफ्रेश' : 'Refresh Orders'}</span>
+                  </button>
                 </div>
               </div>
 
-              {/* ACTIVE SUBSCRIPTION STATUS CARD */}
-              <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-emerald-500/10 border-2 border-amber-400/80 shadow-inner space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-amber-600 text-white flex items-center justify-center font-bold shadow-md shadow-amber-600/30">
-                      <Award className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-stone-900 text-base">
-                          {activePlan === 'gold' && 'Gold Verified Heritage Partner'}
-                          {activePlan === 'platinum' && 'Platinum Heritage Guild'}
-                          {activePlan === 'silver' && 'Silver Trial (Free Plan)'}
-                        </span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500 text-white flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                          <span>ACTIVE</span>
-                        </span>
-                      </div>
-                      <p className="text-xs text-stone-600">
-                        Shop: <strong className="text-stone-900">{formData.shopName}</strong> • Pehchan: <span className="font-mono font-bold text-amber-800">{formData.pehchanId}</span>
-                      </p>
-                    </div>
+              {/* Financial & Order Metric Counters */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-amber-900">
+                    {lang === 'hi' ? 'कुल प्राप्त ऑर्डर' : 'Total Orders'}
                   </div>
-
-                  <div className="flex items-center gap-2 sm:self-center">
-                    <button
-                      onClick={() => {
-                        setPlanModalTarget(activePlan === 'gold' ? 'platinum' : 'gold');
-                        setShowPlanModal(true);
-                      }}
-                      className="px-4 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold shadow-sm transition-all active:scale-95"
-                    >
-                      {activePlan === 'platinum' ? 'Manage Plan' : 'Upgrade Plan'}
-                    </button>
-                    <button
-                      onClick={() => window.print()}
-                      className="px-3.5 py-2 rounded-xl bg-white hover:bg-stone-50 border border-stone-300 text-stone-800 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs"
-                    >
-                      <Printer className="w-3.5 h-3.5 text-stone-600" />
-                      <span>Print Standee QR</span>
-                    </button>
+                  <div className="text-2xl font-serif font-black text-amber-950 mt-1">
+                    {orders.length}
+                  </div>
+                  <div className="text-[10px] text-amber-700/80 mt-0.5">
+                    {lang === 'hi' ? 'ओडीओपी बाज़ार से' : 'via ODOP Bazaar'}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2 text-xs border-t border-amber-200/60">
-                  <div className="p-2.5 rounded-xl bg-white/80 border border-amber-200/50">
-                    <span className="text-[10px] text-stone-400 block font-medium">Subscription Cost</span>
-                    <span className="font-bold text-stone-900 text-sm">
-                      {activePlan === 'gold' && (billingCycle === 'monthly' ? '₹199 / mo' : '₹1,999 / yr')}
-                      {activePlan === 'platinum' && (billingCycle === 'monthly' ? '₹499 / mo' : '₹4,499 / yr')}
-                      {activePlan === 'silver' && '₹0 (Free Trial)'}
-                    </span>
+                <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200/80">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-900">
+                    {lang === 'hi' ? 'कारीगर निवल कमाई (100%)' : 'Net Artisan Earnings (100%)'}
                   </div>
-                  <div className="p-2.5 rounded-xl bg-white/80 border border-amber-200/50">
-                    <span className="text-[10px] text-stone-400 block font-medium">Next Renewal</span>
-                    <span className="font-bold text-stone-900 text-sm">24 Oct 2026</span>
+                  <div className="text-2xl font-serif font-black text-emerald-950 mt-1">
+                    ₹{orders.reduce((sum, o) => sum + (o.artisanShare || Number(o.totalAmount || o.price || 0)), 0).toLocaleString('en-IN')}
                   </div>
-                  <div className="p-2.5 rounded-xl bg-white/80 border border-amber-200/50">
-                    <span className="text-[10px] text-stone-400 block font-medium">Platform Fee</span>
-                    <span className="font-bold text-emerald-700 text-sm">₹0 Commission</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-white/80 border border-amber-200/50">
-                    <span className="text-[10px] text-stone-400 block font-medium">In-Store Payout</span>
-                    <span className="font-bold text-emerald-700 text-sm">100% Direct Cash/UPI</span>
+                  <div className="text-[10px] text-emerald-700/80 mt-0.5">
+                    {lang === 'hi' ? '100% प्रत्यक्ष भुगतान' : '100% Guaranteed Remittance'}
                   </div>
                 </div>
-              </div>
 
-              {/* FOOTFALL & TOURIST LEAD ANALYTICS */}
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-serif font-bold text-stone-900 text-sm flex items-center gap-1.5">
-                    <TrendingUp className="w-4 h-4 text-emerald-600" />
-                    <span>In-Store Footfall & Tourist Lead Performance (30 Days)</span>
-                  </h4>
-                  <span className="text-[11px] text-stone-400">Live Geolocation Feed</span>
+                <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200/80">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-blue-900">
+                    {lang === 'hi' ? 'प्रक्रियाधीन / डिस्पैच' : 'In Fulfillment'}
+                  </div>
+                  <div className="text-2xl font-serif font-black text-blue-950 mt-1">
+                    {orders.filter((o) => o.status === 'placed' || o.status === 'crafting' || o.status === 'dispatched').length}
+                  </div>
+                  <div className="text-[10px] text-blue-700/80 mt-0.5">
+                    {lang === 'hi' ? 'सक्रिय पार्सल' : 'Active Parcels'}
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200">
-                    <span className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider block">
-                      Direct In-Store Sales
-                    </span>
-                    <div className="text-2xl font-serif font-extrabold text-emerald-700 mt-1">
-                      ₹1,28,400
-                    </div>
-                    <span className="text-[10px] text-emerald-600 font-medium">
-                      100% Kept by Artisan (₹0 Fee)
-                    </span>
+                <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-stone-700">
+                    {lang === 'hi' ? 'डाक लॉजिस्टिक्स पार्टनर' : 'Logistics Partner'}
                   </div>
-
-                  <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200">
-                    <span className="text-[10px] text-amber-800 font-bold uppercase tracking-wider block">
-                      Directions Clicks
-                    </span>
-                    <div className="text-2xl font-serif font-extrabold text-amber-700 mt-1">
-                      218 Visits
-                    </div>
-                    <span className="text-[10px] text-amber-600 font-medium">
-                      Google Maps Navigation to Shop
-                    </span>
+                  <div className="text-sm font-bold text-stone-900 mt-2 flex items-center gap-1.5">
+                    <Truck className="w-4 h-4 text-orange-600 shrink-0" />
+                    <span>India Post SpeedPost</span>
                   </div>
-
-                  <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200">
-                    <span className="text-[10px] text-blue-800 font-bold uppercase tracking-wider block">
-                      Direct Inquiries
-                    </span>
-                    <div className="text-2xl font-serif font-extrabold text-blue-700 mt-1">
-                      64 Chats
-                    </div>
-                    <span className="text-[10px] text-blue-600 font-medium">
-                      WhatsApp & Calls from Tourists
-                    </span>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200">
-                    <span className="text-[10px] text-stone-700 font-bold uppercase tracking-wider block">
-                      Courier / Return Scams
-                    </span>
-                    <div className="text-2xl font-serif font-extrabold text-stone-800 mt-1">
-                      0 Incidents
-                    </div>
-                    <span className="text-[10px] text-stone-500 font-medium">
-                      100% Protected (In-Store Only)
-                    </span>
+                  <div className="text-[10px] text-stone-500 mt-1">
+                    {lang === 'hi' ? 'राष्ट्रीय ट्रैकिंग सहित' : 'National AWB Tracking'}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* BILLING CYCLE SWITCHER & 3 SUBSCRIPTION TIERS */}
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* Orders Feed */}
+            {orders.length === 0 ? (
+              <div className="bg-white rounded-3xl p-10 border border-stone-200 text-center space-y-3">
+                <div className="w-16 h-16 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto border border-amber-300">
+                  <Package className="w-8 h-8" />
+                </div>
+                <h4 className="font-serif text-lg font-bold text-stone-900">
+                  {lang === 'hi' ? 'अभी कोई नया ऑनलाइन ऑर्डर नहीं है' : 'No Incoming Orders Yet'}
+                </h4>
+                <p className="text-xs text-stone-500 max-w-md mx-auto leading-relaxed">
+                  {lang === 'hi'
+                    ? 'जैसे ही पर्यटक या देश भर के ग्राहक आपके उत्पादों का ऑर्डर देंगे, उनका विवरण, शिपिंग पता और 100% भुगतान यहाँ दिखाई देगा।'
+                    : 'When tourists or patrons order your handcrafted items from the ODOP Bazaar, their shipment details and prepaid escrow release will appear here immediately.'}
+                </p>
+                <div className="pt-2">
+                  <button
+                    onClick={() => setActiveTab('add')}
+                    className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold shadow-md shadow-orange-600/30 transition-all"
+                  >
+                    {lang === 'hi' ? '+ नया हस्तशिल्प जोड़ें' : '+ List More Handcrafted Items'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {orders.map((order) => {
+                  const items = Array.isArray(order.items) ? order.items : [];
+                  const isUpdating = updatingOrderId === order.id;
+                  const artisanNet = order.artisanShare || Number(order.totalAmount || order.price || 0);
+
+                  return (
+                    <div
+                      key={order.id}
+                      className="bg-white rounded-3xl p-5 sm:p-6 border border-stone-200 shadow-sm space-y-4 hover:border-amber-400/80 transition-all"
+                    >
+                      {/* Order Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-stone-100">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-stone-900 text-white flex items-center justify-center font-mono font-bold text-xs">
+                            #{order.id}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-stone-900 text-sm">
+                                {lang === 'hi' ? 'ऑर्डर' : 'Order'} #{order.id}
+                              </span>
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${order.status === 'delivered'
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                  : order.status === 'dispatched'
+                                    ? 'bg-indigo-100 text-indigo-800 border border-indigo-300'
+                                    : order.status === 'crafting'
+                                      ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                                      : 'bg-amber-100 text-amber-800 border border-amber-300'
+                                  }`}
+                              >
+                                {order.status === 'placed' && (lang === 'hi' ? 'ऑर्डर प्राप्त' : 'Order Placed')}
+                                {order.status === 'crafting' && (lang === 'hi' ? 'तैयारी / पैकिंग' : 'Crafting & Packing')}
+                                {order.status === 'dispatched' && (lang === 'hi' ? 'डिस्पैच (पार्सल रवाना)' : 'Dispatched')}
+                                {order.status === 'delivered' && (lang === 'hi' ? 'सफलतापूर्वक सुपुर्द' : 'Delivered')}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-stone-500 flex items-center gap-2 mt-0.5">
+                              <Clock className="w-3 h-3 text-stone-400" />
+                              <span>{order.createdAt ? new Date(order.createdAt).toLocaleString('en-IN') : 'Recent'}</span>
+                              <span>•</span>
+                              <span>{order.paymentMethod || 'Prepaid Escrow (UPI)'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Status Update Action Button */}
+                        <div className="flex items-center gap-2">
+                          {order.status === 'placed' && (
+                            <button
+                              disabled={isUpdating}
+                              onClick={() => handleUpdateOrderStatus(order.id, 'crafting')}
+                              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-600/30 flex items-center gap-1.5 transition-all disabled:opacity-50"
+                            >
+                              {isUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Package className="w-3.5 h-3.5" />}
+                              <span>{lang === 'hi' ? 'पैकिंग शुरू करें' : 'Begin Crafting & Packing'}</span>
+                            </button>
+                          )}
+
+                          {order.status === 'crafting' && (
+                            <button
+                              disabled={isUpdating}
+                              onClick={() => handleUpdateOrderStatus(order.id, 'dispatched')}
+                              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/30 flex items-center gap-1.5 transition-all disabled:opacity-50"
+                            >
+                              {isUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Truck className="w-3.5 h-3.5" />}
+                              <span>{lang === 'hi' ? 'स्पीडपोस्ट को सौंपें (डिस्पैच)' : 'Dispatch via India Post (Generate AWB)'}</span>
+                            </button>
+                          )}
+
+                          {order.status === 'dispatched' && (
+                            <button
+                              disabled={isUpdating}
+                              onClick={() => handleUpdateOrderStatus(order.id, 'delivered')}
+                              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/30 flex items-center gap-1.5 transition-all disabled:opacity-50"
+                            >
+                              {isUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                              <span>{lang === 'hi' ? 'सुपुर्दगी की पुष्टि (डिलीवर)' : 'Mark Delivered (Release Escrow)'}</span>
+                            </button>
+                          )}
+
+                          {order.status === 'delivered' && (
+                            <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                              <span>{lang === 'hi' ? 'भुगतान विमुक्त' : 'Escrow Remitted'}</span>
+                            </span>
+                          )}
+
+                          {/* Print Shipping Slip Action */}
+                          <button
+                            type="button"
+                            onClick={() => handlePrintOrderSlip(order)}
+                            className="px-3 py-2 rounded-xl border border-stone-300 hover:bg-stone-100 text-stone-800 text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                            title={lang === 'hi' ? 'डाक चालान / शिपिंग लेबल प्रिंट करें' : 'Print SpeedPost Shipping Label & Packing Slip'}
+                          >
+                            <Printer className="w-3.5 h-3.5 text-stone-600" />
+                            <span>{lang === 'hi' ? 'चालान प्रिंट' : 'Print Slip'}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Content Grid: Items & Customer Details */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                        {/* Customer & Shipping Details */}
+                        <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/80 space-y-1.5">
+                          <div className="font-bold text-stone-900 flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 text-stone-600" />
+                            <span>{lang === 'hi' ? 'डिलीवरी पता एवं संपर्क:' : 'Buyer & Delivery Address:'}</span>
+                          </div>
+                          <div className="font-medium text-stone-800 pl-5">
+                            {order.customerName}
+                          </div>
+                          <div className="text-stone-600 pl-5 flex items-center gap-1">
+                            <Phone className="w-3 h-3 text-stone-400" />
+                            <span>{order.customerPhone}</span>
+                            {order.customerEmail && <span className="text-stone-400">({order.customerEmail})</span>}
+                          </div>
+                          <div className="text-stone-600 pl-5 flex items-start gap-1">
+                            <MapPin className="w-3 h-3 text-orange-600 shrink-0 mt-0.5" />
+                            <span>{order.customerAddress || 'Direct In-Studio Handover'}</span>
+                          </div>
+
+                          {order.trackingNumber && (
+                            <div className="mt-2 pt-2 border-t border-stone-200/80 pl-5">
+                              <div className="text-[10px] text-stone-500 font-bold uppercase tracking-wider">
+                                {lang === 'hi' ? 'इंडिया पोस्ट AWB नंबर' : 'India Post SpeedPost AWB'}
+                              </div>
+                              <div className="font-mono font-bold text-orange-700 text-xs flex items-center gap-1">
+                                <Truck className="w-3 h-3" />
+                                <span>{order.trackingNumber}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Items & Payment Payout Breakdown */}
+                        <div className="p-3.5 rounded-2xl bg-amber-50/60 border border-amber-200/80 space-y-2">
+                          <div className="font-bold text-amber-950 flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                              <ShoppingBag className="w-3.5 h-3.5 text-amber-700" />
+                              <span>{lang === 'hi' ? 'आइटम्स:' : 'Ordered Crafts:'}</span>
+                            </span>
+                            <span className="text-stone-500 font-normal">
+                              {items.length} {items.length === 1 ? 'item' : 'items'}
+                            </span>
+                          </div>
+
+                          <div className="space-y-1 divide-y divide-amber-200/40 max-h-28 overflow-y-auto">
+                            {items.map((it, idx) => (
+                              <div key={idx} className="pt-1 first:pt-0 flex items-center justify-between text-[11px]">
+                                <span className="text-stone-800 font-medium truncate max-w-[200px]">
+                                  {it.quantity}x {it.name || it.title}
+                                </span>
+                                <span className="font-mono font-bold text-stone-900">
+                                  ₹{(Number(it.price) * (it.quantity || 1)).toLocaleString('en-IN')}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Payout Summary */}
+                          <div className="pt-2 border-t border-amber-200 flex items-center justify-between text-xs">
+                            <div>
+                              <div className="text-[10px] text-stone-500">
+                                {lang === 'hi' ? 'ग्राहक द्वारा प्रदत्त कुल राशि' : 'Buyer Total'}
+                              </div>
+                              <div className="font-mono text-stone-700">₹{order.totalAmount}</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
+                                {lang === 'hi' ? 'कारीगर प्रत्यक्ष भुगतान (100%)' : 'Artisan Share (100%)'}
+                              </div>
+                              <div className="font-serif font-extrabold text-base text-emerald-700">
+                                ₹{artisanNet.toLocaleString('en-IN')}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 4: TRANSPARENT FAIR-TRADE POLICY & WORKSHOP QR */}
+        {activeTab === 'fee-policy' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200 shadow-sm space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-stone-100">
                 <div>
-                  <h4 className="font-serif text-lg sm:text-xl font-bold text-stone-900">
-                    Select Your Shop Listing Tier
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 text-xs font-bold mb-2">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>{lang === 'hi' ? 'पारदर्शी 100% शून्य-सदस्यता नीति' : 'Zero-Subscription Fair-Trade Guarantee'}</span>
+                  </div>
+                  <h3 className="font-serif text-2xl sm:text-3xl font-bold text-stone-900">
+                    {lang === 'hi' ? 'मंच शुल्क संरचना एवं कारीगर सुरक्षा' : 'Platform Fee Matrix & Artisan Protection'}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-stone-500 mt-1 max-w-2xl leading-relaxed">
+                    {lang === 'hi'
+                      ? 'संस्कृतिकोज पर कोई भी मासिक या वार्षिक सब्सक्रिप्शन शुल्क नहीं है। शून्य प्लेटफ़ॉर्म कमीशन और 100% सीधी कमाई।'
+                      : 'SanskritiKhoj charges NO monthly or annual subscriptions. Authentic artisans retain 100% of sales with zero platform cuts.'}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handlePrintStandee}
+                    className="px-4 py-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>{lang === 'hi' ? 'क्यूआर स्टैंडी प्रिंट करें' : 'Print Counter Standee'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 5 Core Policy Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                {/* 1. Zero Subscriptions */}
+                <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200/80 space-y-2">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold">
+                    <ShieldCheck className="w-4 h-4" />
+                  </div>
+                  <h4 className="font-bold text-emerald-950 text-sm">
+                    {lang === 'hi' ? '1. ₹0 सदस्यता शुल्क (No Monthly Plans)' : '1. Zero Monthly Subscriptions'}
+                  </h4>
+                  <p className="text-stone-600 leading-relaxed">
+                    {lang === 'hi'
+                      ? 'कोई आवर्ती मासिक या वार्षिक शुल्क नहीं। सभी प्रमाणित कारीगरों को आजीवन निःशुल्क प्रोफाइल और उपस्थिति प्राप्त है।'
+                      : 'No recurring monthly or annual lock-ins. Every authentic artisan enjoys lifetime verified listing and workshop discovery.'}
+                  </p>
+                </div>
+
+                {/* 2. One-Time Listing Fee ₹49 */}
+                <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200/80 space-y-2">
+                  <div className="w-8 h-8 rounded-xl bg-amber-600 text-white flex items-center justify-center font-bold">
+                    <Coins className="w-4 h-4" />
+                  </div>
+                  <h4 className="font-bold text-amber-950 text-sm">
+                    {lang === 'hi' ? '2. ₹0 निःशुल्क कैटलॉगिंग (0% प्रोमो)' : '2. ₹0 Free Cataloging (0% Promo)'}
+                  </h4>
+                  <p className="text-stone-600 leading-relaxed">
+                    {lang === 'hi'
+                      ? 'नए हस्तशिल्प को सूचीबद्ध करने का कोई शुल्क नहीं। डिजिटल कैटलॉग निर्माण एवं जीआई सत्यापन 100% निःशुल्क है।'
+                      : 'Zero listing fee per product during our cultural revival promo. High-resolution digital cataloging and Ministry GI verification are 100% free.'}
+                  </p>
+                </div>
+
+                {/* 3. 100% Direct Remittance */}
+                <div className="p-4 rounded-2xl bg-orange-50/60 border border-orange-200/80 space-y-2">
+                  <div className="w-8 h-8 rounded-xl bg-orange-600 text-white flex items-center justify-center font-bold">
+                    <TrendingUp className="w-4 h-4" />
+                  </div>
+                  <h4 className="font-bold text-orange-950 text-sm">
+                    {lang === 'hi' ? '3. 100% सीधी कारीगर कमाई (0% कमीशन)' : '3. 100% Guaranteed Artisan Share'}
+                  </h4>
+                  <p className="text-stone-600 leading-relaxed">
+                    {lang === 'hi'
+                      ? 'उत्पाद की बिक्री कीमत का पूरा 100% सीधे आपके बैंक खाते / यूपीआई में जाता है। 0% प्लेटफ़ॉर्म कमीशन।'
+                      : 'A full 100% of gross craft price is routed directly to your verified bank or cooperative account. Zero middleman cuts.'}
+                  </p>
+                </div>
+
+                {/* 4. Buyer Escrow Fee ₹0 */}
+                <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-200/80 space-y-2">
+                  <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <h4 className="font-bold text-blue-950 text-sm">
+                    {lang === 'hi' ? '4. ₹0 खरीदार शुल्क (निःशुल्क एस्क्रो)' : '4. ₹0 Buyer Platform Surcharge'}
+                  </h4>
+                  <p className="text-stone-600 leading-relaxed">
+                    {lang === 'hi'
+                      ? 'खरीदार को केवल शिल्प का वास्तविक मूल्य देना होता है। कोई अतिरिक्त प्लेटफ़ॉर्म सरचार्ज नहीं।'
+                      : 'Buyers pay only pure artisan craft MRP. No extra platform commission or surcharge is added.'}
+                  </p>
+                </div>
+
+                {/* 5. In-Store Workshop 100% Free */}
+                <div className="p-4 rounded-2xl bg-purple-50/60 border border-purple-200/80 space-y-2">
+                  <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center font-bold">
+                    <Store className="w-4 h-4" />
+                  </div>
+                  <h4 className="font-bold text-purple-950 text-sm">
+                    {lang === 'hi' ? '5. इन-स्टोर पर्यटकों से 100% प्रत्यक्ष नकद' : '5. 100% In-Store Direct Counter Sales'}
+                  </h4>
+                  <p className="text-stone-600 leading-relaxed">
+                    {lang === 'hi'
+                      ? 'जब पर्यटक आपकी कार्यशाला में आते हैं, तो पूरा भुगतान सीधे आपको मिलता है (0% मंच शुल्क)। कोई कूरियर या पार्सल जोखिम नहीं।'
+                      : 'Visiting tourists pay you directly at your shop counter (Cash/UPI). SanskritiKhoj takes 0% cut from counter sales.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Physical Workshop Countertop QR Standee (Print Ready) */}
+              <div className="pt-6 border-t border-stone-200">
+                <div className="text-center max-w-md mx-auto space-y-2 pb-4">
+                  <h4 className="font-serif text-lg font-bold text-stone-900">
+                    {lang === 'hi' ? 'दुकान काउंटर स्टैंडी (प्रिंट हेतु तैयार)' : 'Workshop Countertop Standee (Print Ready)'}
                   </h4>
                   <p className="text-xs text-stone-500">
-                    Fair, transparent subscription plans designed to empower hereditary craft clusters.
+                    {lang === 'hi'
+                      ? 'इस स्टैंडी को प्रिंट करके अपनी दुकान पर रखें ताकि स्मारक देखने वाले पर्यटक आपका प्रमाण पत्र और कहानी देख सकें।'
+                      : 'Print this badge on cardstock and display it at your workshop counter for tourists visiting nearby monuments.'}
                   </p>
                 </div>
 
-                {/* Monthly / Annual Toggle */}
-                <div className="inline-flex items-center p-1 bg-stone-100 rounded-2xl border border-stone-200 self-start sm:self-auto">
-                  <button
-                    onClick={() => setBillingCycle('monthly')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                      billingCycle === 'monthly'
-                        ? 'bg-white text-stone-900 shadow-xs'
-                        : 'text-stone-500 hover:text-stone-900'
-                    }`}
-                  >
-                    Monthly Billing
-                  </button>
-                  <button
-                    onClick={() => setBillingCycle('annual')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                      billingCycle === 'annual'
-                        ? 'bg-white text-stone-900 shadow-xs'
-                        : 'text-stone-500 hover:text-stone-900'
-                    }`}
-                  >
-                    <span>Annual Billing</span>
-                    <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[9px] font-extrabold">
-                      SAVE 16%
-                    </span>
-                  </button>
-                </div>
-              </div>
-
-              {/* The 3 Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* TIER 1: SILVER TRIAL */}
-                <div className={`rounded-3xl p-6 border transition-all flex flex-col justify-between ${
-                  activePlan === 'silver'
-                    ? 'bg-stone-50 border-stone-400 shadow-md ring-2 ring-stone-400'
-                    : 'bg-white border-stone-200 hover:border-stone-300 shadow-xs'
-                }`}>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-stone-100 text-stone-700">
-                        Silver Trial (सिल्वर)
-                      </span>
-                      {activePlan === 'silver' && (
-                        <span className="text-[10px] font-extrabold text-stone-700 uppercase bg-stone-200 px-2 py-0.5 rounded-md">
-                          Current
-                        </span>
-                      )}
-                    </div>
-
-                    <div>
-                      <div className="flex items-baseline gap-1">
-                        <span className="font-serif text-3xl font-extrabold text-stone-900">₹0</span>
-                        <span className="text-xs text-stone-500">/ 14 Days Free</span>
-                      </div>
-                      <p className="text-[11px] text-stone-500 mt-1">
-                        For individual village craftspeople testing digital tourist footfall.
-                      </p>
-                    </div>
-
-                    <div className="space-y-2.5 text-xs text-stone-700 border-t border-stone-100 pt-3">
-                      <div className="flex items-start gap-2">
-                        <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                        <span><strong>1 Craft Item</strong> listed in ODOP directory</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                        <span>Basic physical shop address displayed</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                        <span><strong>100% In-Store Direct Payout</strong> (0% fee)</span>
-                      </div>
-                      <div className="flex items-start gap-2 text-stone-400">
-                        <X className="w-4 h-4 text-stone-300 shrink-0 mt-0.5" />
-                        <span>No 1-Click Google Maps turn-by-turn pin</span>
-                      </div>
-                      <div className="flex items-start gap-2 text-stone-400">
-                        <X className="w-4 h-4 text-stone-300 shrink-0 mt-0.5" />
-                        <span>No printable counter standee QR code</span>
-                      </div>
-                    </div>
+                <div className="max-w-md mx-auto bg-gradient-to-b from-amber-500/15 via-white to-amber-500/10 p-6 sm:p-8 rounded-3xl border-2 border-stone-800 shadow-xl space-y-4 text-center">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-stone-900 text-amber-400 text-[10px] font-mono font-bold">
+                    <Award className="w-3.5 h-3.5 text-amber-400" />
+                    <span>MINISTRY OF TEXTILES • VERIFIED ARTISAN WORKSHOP</span>
                   </div>
 
-                  <button
-                    disabled={activePlan === 'silver'}
-                    onClick={() => {
-                      setPlanModalTarget('silver');
-                      setShowPlanModal(true);
-                    }}
-                    className={`mt-6 w-full py-2.5 rounded-xl text-xs font-bold transition-all ${
-                      activePlan === 'silver'
-                        ? 'bg-stone-200 text-stone-500 cursor-default'
-                        : 'bg-stone-100 hover:bg-stone-200 text-stone-800'
-                    }`}
-                  >
-                    {activePlan === 'silver' ? 'Current Free Plan' : 'Switch to Silver Trial'}
-                  </button>
-                </div>
-
-                {/* TIER 2: GOLD VERIFIED PARTNER (POPULAR) */}
-                <div className={`rounded-3xl p-6 border-2 transition-all flex flex-col justify-between relative ${
-                  activePlan === 'gold'
-                    ? 'bg-amber-50/40 border-amber-500 shadow-xl ring-2 ring-amber-500/30'
-                    : 'bg-white border-amber-300 hover:border-amber-400 shadow-md'
-                }`}>
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-amber-600 to-orange-600 text-white text-[10px] font-extrabold uppercase tracking-wider shadow-sm flex items-center gap-1">
-                    <Sparkles className="w-3 h-3" />
-                    <span>RECOMMENDED BY GUILD</span>
-                  </div>
-
-                  <div className="space-y-4 pt-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-amber-100 text-amber-900">
-                        Gold Verified (स्वर्ण पार्टनर)
-                      </span>
-                      {activePlan === 'gold' && (
-                        <span className="text-[10px] font-extrabold text-amber-800 uppercase bg-amber-200/90 px-2 py-0.5 rounded-md flex items-center gap-1">
-                          <Check className="w-3 h-3 text-emerald-700" />
-                          <span>Active Plan</span>
-                        </span>
-                      )}
-                    </div>
-
-                    <div>
-                      <div className="flex items-baseline gap-1">
-                        <span className="font-serif text-3xl font-extrabold text-stone-900">
-                          {billingCycle === 'monthly' ? '₹199' : '₹1,999'}
-                        </span>
-                        <span className="text-xs text-stone-500">
-                          {billingCycle === 'monthly' ? '/ month' : '/ year (₹166/mo)'}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-stone-500 mt-1">
-                        Complete discovery kit for certified workshops, retail stores, and weavers.
-                      </p>
-                    </div>
-
-                    <div className="space-y-2.5 text-xs text-stone-800 border-t border-amber-200/60 pt-3">
-                      <div className="flex items-start gap-2">
-                        <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                        <span><strong>Unlimited Craft Listings</strong> with photos</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                        <span><strong>1-Click Turn-by-Turn Google Maps</strong> navigation pin</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                        <span><strong>Direct WhatsApp & Phone</strong> tourist chat buttons</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                        <span><strong>Printable Counter Standee QR</strong> with Govt GI seal</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                        <span><strong>Monument Cross-Discovery</strong> (featured within 500m)</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                        <span><strong>0% Sales Commission</strong> (Keep 100% In-Store Cash/UPI)</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                        <span><strong>Zero Delivery Scam Risk</strong> (no transit damage/fraud)</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      setPlanModalTarget('gold');
-                      setShowPlanModal(true);
-                    }}
-                    className={`mt-6 w-full py-2.5 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 ${
-                      activePlan === 'gold'
-                        ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                        : 'bg-stone-900 hover:bg-stone-800 text-white'
-                    }`}
-                  >
-                    {activePlan === 'gold' ? 'Active Plan (Manage / Renew)' : 'Upgrade to Gold Verified'}
-                  </button>
-                </div>
-
-                {/* TIER 3: PLATINUM HERITAGE GUILD */}
-                <div className={`rounded-3xl p-6 border transition-all flex flex-col justify-between ${
-                  activePlan === 'platinum'
-                    ? 'bg-purple-50/50 border-purple-500 shadow-xl ring-2 ring-purple-500/30'
-                    : 'bg-white border-stone-200 hover:border-purple-300 shadow-xs'
-                }`}>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-purple-100 text-purple-900">
-                        Platinum Guild (प्लैटिनम)
-                      </span>
-                      {activePlan === 'platinum' && (
-                        <span className="text-[10px] font-extrabold text-purple-800 uppercase bg-purple-200 px-2 py-0.5 rounded-md">
-                          Active Plan
-                        </span>
-                      )}
-                    </div>
-
-                    <div>
-                      <div className="flex items-baseline gap-1">
-                        <span className="font-serif text-3xl font-extrabold text-stone-900">
-                          {billingCycle === 'monthly' ? '₹499' : '₹4,499'}
-                        </span>
-                        <span className="text-xs text-stone-500">
-                          {billingCycle === 'monthly' ? '/ month' : '/ year (₹374/mo)'}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-stone-500 mt-1">
-                        For renowned master artisans, national awardees & state cooperatives.
-                      </p>
-                    </div>
-
-                    <div className="space-y-2.5 text-xs text-stone-700 border-t border-stone-100 pt-3">
-                      <div className="flex items-start gap-2">
-                        <Check className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
-                        <span><strong>Everything in Gold Plan</strong> included</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <Check className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
-                        <span><strong>Monument Audio Guide Spotlight</strong> ("Recommended Artisan")</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <Check className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
-                        <span><strong>Live Workshop Demonstration Badge</strong> for tourists</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <Check className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
-                        <span><strong>Multi-lingual translation</strong> for international tourists</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <Check className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
-                        <span><strong>ODOP Bazaar Top Carousel Feature</strong></span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      setPlanModalTarget('platinum');
-                      setShowPlanModal(true);
-                    }}
-                    className={`mt-6 w-full py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 ${
-                      activePlan === 'platinum'
-                        ? 'bg-purple-700 hover:bg-purple-800 text-white'
-                        : 'bg-stone-900 hover:bg-stone-800 text-white'
-                    }`}
-                  >
-                    {activePlan === 'platinum' ? 'Active Platinum Guild' : 'Upgrade to Platinum Guild'}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* PRINTABLE IN-STORE COUNTER STANDEE QR PREVIEW */}
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-stone-100">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center font-bold">
-                    <QrCode className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="font-serif font-bold text-stone-900 text-base">
-                      Your In-Store Counter Standee QR (काउंटर क्यूआर स्टेंडी)
-                    </h4>
-                    <p className="text-xs text-stone-500">
-                      Place this QR standee on your physical shop counter for visiting tourists to verify Govt GI Authenticity.
+                  <div className="space-y-1">
+                    <h3 className="font-serif text-xl sm:text-2xl font-bold text-stone-900">
+                      {formData.shopName || `${formData.artisanName} Studio`}
+                    </h3>
+                    <p className="text-xs text-stone-600">
+                      {formData.shopAddress}
                     </p>
+                    {formData.shopLandmark && (
+                      <p className="text-[11px] font-medium text-orange-700">
+                        📍 {formData.shopLandmark}
+                      </p>
+                    )}
                   </div>
-                </div>
 
-                <button
-                  onClick={() => window.print()}
-                  className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-orange-600/20 transition-all active:scale-95 self-start sm:self-auto"
-                >
-                  <Printer className="w-4 h-4" />
-                  <span>Print Official Counter Standee</span>
-                </button>
-              </div>
-
-              {/* Visual Standee Preview Card */}
-              <div className="max-w-md mx-auto p-6 rounded-3xl bg-gradient-to-b from-[#faf6ee] to-white border-2 border-amber-300 shadow-xl text-center space-y-4 relative overflow-hidden">
-                <div className="absolute top-0 left-0 right-0 bg-stone-900 text-amber-300 py-1.5 text-[10px] font-bold tracking-widest uppercase flex items-center justify-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Ministry of Textiles • ODOP Certified Partner</span>
-                </div>
-
-                <div className="pt-4 space-y-1">
-                  <span className="text-[10px] font-extrabold text-orange-600 uppercase tracking-widest block">
-                    SanskritiKhoj • Digital Heritage Portal
-                  </span>
-                  <h3 className="font-serif text-lg font-extrabold text-stone-900">
-                    {formData.shopName}
-                  </h3>
-                  <p className="text-[11px] text-stone-600">
-                    {formData.shopAddress}
-                  </p>
-                </div>
-
-                {/* QR Code Container */}
-                <div className="w-44 h-44 mx-auto p-3 bg-white rounded-2xl border-2 border-stone-800 shadow-md flex flex-col items-center justify-center relative">
-                  {/* Stylized QR representation */}
-                  <div className="w-full h-full bg-stone-900 rounded-xl p-2.5 flex flex-col items-center justify-center text-white relative">
-                    <QrCode className="w-28 h-28 text-white stroke-[1.5]" />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-8 h-8 rounded-lg bg-orange-600 text-white flex items-center justify-center text-[10px] font-extrabold shadow-md border-2 border-white">
-                        GO
+                  {/* QR Code Graphic Container */}
+                  <div className="w-48 h-48 mx-auto p-3 bg-white rounded-2xl border-2 border-stone-900 shadow-md flex flex-col items-center justify-center relative">
+                    <div className="w-full h-full bg-stone-900 rounded-xl p-2.5 flex flex-col items-center justify-center text-white relative">
+                      <QrCode className="w-32 h-32 text-white stroke-[1.5]" />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-9 h-9 rounded-lg bg-orange-600 text-white flex items-center justify-center text-xs font-black shadow-md border-2 border-white">
+                          SK
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="space-y-1 font-mono text-[10px] text-stone-600 bg-stone-50 p-2.5 rounded-xl border border-stone-200">
-                  <div>Govt Pehchan ID: <strong className="text-stone-900">{formData.pehchanId}</strong></div>
-                  <div>GI User Registry: <strong className="text-emerald-700">{formData.giRegNumber || 'GI-IND-2026-UP-1092'}</strong></div>
-                  <div className="text-[9px] text-stone-400 pt-0.5">Scan to view artisan lineage, certifications & craft story</div>
-                </div>
+                  <div className="space-y-1 font-mono text-[11px] text-stone-700 bg-stone-50 p-3 rounded-xl border border-stone-200 text-left">
+                    <div className="flex justify-between">
+                      <span className="text-stone-400">Pehchan ID:</span>
+                      <strong className="text-stone-900">{formData.pehchanId}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-stone-400">GI Auth:</span>
+                      <strong className="text-emerald-700">{formData.giRegNumber || 'GI-IND-2026-UP-1092'}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-stone-400">Craft Guild:</span>
+                      <span className="text-stone-800 truncate max-w-[200px]">{formData.cooperativeName}</span>
+                    </div>
+                  </div>
 
-                <div className="pt-1 flex items-center justify-center gap-2 text-[10px] font-bold text-emerald-800">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>100% Authentic Handcrafted Heritage Guaranteed</span>
+                  <div className="pt-2 flex items-center justify-center gap-2 text-xs font-bold text-emerald-800">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>100% Direct Fair-Trade • 0% Middlemen Cut</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2579,8 +2548,8 @@ export default function ArtisanPortalPage() {
         )}
       </div>
 
-      {/* MODAL: REGISTERED PEHCHAN DATABASE BROWSER */}
-      {showRegistryLookupModal && (
+      {/* MODAL: REGISTERED PEHCHAN DATABASE BROWSER (ADMIN ONLY) */}
+      {isAdmin && showRegistryLookupModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl border border-stone-200 max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between pb-3 border-b border-stone-200">
@@ -2748,206 +2717,6 @@ export default function ArtisanPortalPage() {
                 <ExternalLink className="w-3.5 h-3.5" />
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: SUBSCRIPTION UPGRADE & CHECKOUT */}
-      {showPlanModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-stone-200 relative">
-            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-              <div className="flex items-center gap-2">
-                <Store className="w-5 h-5 text-orange-600" />
-                <h3 className="font-serif font-bold text-lg text-stone-900">
-                  Shop Subscription Activation
-                </h3>
-              </div>
-              <button
-                onClick={() => setShowPlanModal(false)}
-                className="text-stone-400 hover:text-stone-700 font-bold p-1 text-sm"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Plan Summary Card */}
-            <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-amber-900">
-                  Selected Tier
-                </span>
-                <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-md">
-                  0% Sales Commission
-                </span>
-              </div>
-              <div className="flex items-baseline justify-between">
-                <div className="font-serif text-xl font-bold text-stone-900">
-                  {planModalTarget === 'platinum' && 'Platinum Heritage Guild'}
-                  {planModalTarget === 'gold' && 'Gold Verified Partner'}
-                  {planModalTarget === 'silver' && 'Silver Trial (Free Plan)'}
-                </div>
-                <div className="font-serif font-extrabold text-stone-900 text-lg">
-                  {planModalTarget === 'silver'
-                    ? '₹0'
-                    : planModalTarget === 'gold'
-                    ? (billingCycle === 'monthly' ? '₹199' : '₹1,999')
-                    : (billingCycle === 'monthly' ? '₹499' : '₹4,499')}
-                  <span className="text-xs font-normal text-stone-500 font-sans">
-                    {planModalTarget === 'silver' ? ' (14 Days)' : (billingCycle === 'monthly' ? ' / mo' : ' / yr')}
-                  </span>
-                </div>
-              </div>
-              <p className="text-[11px] text-stone-600">
-                Workshop: <strong>{formData.shopName}</strong> ({formData.shopLandmark})
-              </p>
-            </div>
-
-            {/* Payment Method Selector (for paid plans) */}
-            {planModalTarget !== 'silver' && (
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-stone-700 block">
-                  Select Payment Method:
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPlanPaymentMethod('upi')}
-                    className={`p-2.5 rounded-xl border text-center text-xs font-bold transition-all ${
-                      planPaymentMethod === 'upi'
-                        ? 'border-orange-500 bg-orange-50 text-orange-700 ring-1 ring-orange-500'
-                        : 'border-stone-200 text-stone-600 hover:bg-stone-50'
-                    }`}
-                  >
-                    UPI / QR
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPlanPaymentMethod('card')}
-                    className={`p-2.5 rounded-xl border text-center text-xs font-bold transition-all ${
-                      planPaymentMethod === 'card'
-                        ? 'border-orange-500 bg-orange-50 text-orange-700 ring-1 ring-orange-500'
-                        : 'border-stone-200 text-stone-600 hover:bg-stone-50'
-                    }`}
-                  >
-                    RuPay / Card
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPlanPaymentMethod('netbanking')}
-                    className={`p-2.5 rounded-xl border text-center text-xs font-bold transition-all ${
-                      planPaymentMethod === 'netbanking'
-                        ? 'border-orange-500 bg-orange-50 text-orange-700 ring-1 ring-orange-500'
-                        : 'border-stone-200 text-stone-600 hover:bg-stone-50'
-                    }`}
-                  >
-                    Net Banking
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Anti-Scam Assurance */}
-            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-2 text-[10px] text-emerald-800 leading-relaxed">
-              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-              <span>
-                <strong>100% In-Store Direct Payout:</strong> Visiting tourists pay you directly at your shop counter (Cash/UPI). SanskritiKhoj deducts ₹0 platform cut.
-              </span>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowPlanModal(false)}
-                className="px-4 py-2 text-xs font-bold text-stone-600 hover:text-stone-900"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={isProcessingPlan}
-                onClick={() => {
-                  setIsProcessingPlan(true);
-                  setTimeout(async () => {
-                    setIsProcessingPlan(false);
-                    setActivePlan(planModalTarget);
-                    setShowPlanModal(false);
-                    await artisanVerificationService.updatePlan(
-                      currentApp?.pehchanId || formData.pehchanId,
-                      planModalTarget
-                    );
-                    setSubscriptionSuccess({
-                      plan: planModalTarget,
-                      cycle: billingCycle,
-                      date: new Date().toLocaleDateString('en-IN'),
-                      txnId: `TXN-ODOP-${Math.floor(100000 + Math.random() * 900000)}`,
-                    });
-                  }, 800);
-                }}
-                className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold shadow-md shadow-orange-600/30 flex items-center gap-2 disabled:opacity-50 transition-all active:scale-95"
-              >
-                {isProcessingPlan ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Activating Subscription...</span>
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="w-3.5 h-3.5" />
-                    <span>Confirm & Activate Plan</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: SUBSCRIPTION SUCCESS RECEIPT */}
-      {subscriptionSuccess && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl border-2 border-emerald-500/40 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto border border-emerald-300">
-              <CheckCircle2 className="w-8 h-8" />
-            </div>
-
-            <div className="space-y-1">
-              <h3 className="font-serif font-bold text-xl text-stone-900">
-                Subscription Activated!
-              </h3>
-              <p className="text-xs text-stone-500">
-                Your shop listing is now live with enhanced tourist discovery features.
-              </p>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200 text-left font-mono text-[11px] space-y-1.5 text-stone-700">
-              <div className="flex justify-between">
-                <span className="text-stone-400">Plan:</span>
-                <strong className="text-stone-900 capitalize">{subscriptionSuccess.plan} Verified</strong>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-stone-400">Transaction ID:</span>
-                <span className="text-emerald-700 font-bold">{subscriptionSuccess.txnId}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-stone-400">Pehchan ID:</span>
-                <span>{formData.pehchanId}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-stone-400">Commission:</span>
-                <strong className="text-emerald-700 font-bold">₹0 (100% In-Store)</strong>
-              </div>
-            </div>
-
-            <button
-              onClick={() => {
-                setSubscriptionSuccess(null);
-                setActiveTab('add');
-              }}
-              className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/30 transition-all active:scale-95"
-            >
-              Continue to List Crafts
-            </button>
           </div>
         </div>
       )}
@@ -3120,6 +2889,26 @@ export default function ArtisanPortalPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Artisan ₹49 Listing Fee Payment Gateway Modal */}
+      <PaymentGatewayModal
+        isOpen={showListingPaymentModal}
+        onClose={() => setShowListingPaymentModal(false)}
+        amount={49}
+        purpose={lang === 'hi' ? 'कारीगर एकमुश्त कैटलॉगिंग व जीआई सत्यापन शुल्क' : 'One-Time Artisan Cataloging & GI Registry Stamping'}
+        artisanName={formData.artisanName || 'Master Artisan Guild'}
+        onPaymentSuccess={(details) => {
+          setShowListingPaymentModal(false);
+          setListingFeePaid(true);
+          setListingPaymentUtr(details.utr);
+        }}
+      />
+
+      {/* Printable Portals mounted directly to document.body */}
+      <PrintableStandeePortal artisanData={formData} />
+      {orderToPrint && (
+        <PrintableShippingSlipPortal order={orderToPrint} artisanInfo={formData} />
       )}
     </div>
   );

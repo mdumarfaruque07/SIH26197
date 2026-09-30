@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { placeService, productService, foodService } from '../services/api';
 import AudioNarrationPlayer from '../components/AudioNarrationPlayer';
 import InstagramPostCard from '../components/InstagramPostCard';
 import { useLanguage } from '../context/LanguageContext';
+import { useCart } from '../context/CartContext';
 import {
   MapPin,
   Star,
@@ -230,6 +231,8 @@ const getGuidedTrail = (place) => {
 
 export default function PlaceDetailPage({ onOpenPostModal }) {
   const { slug } = useParams();
+  const navigate = useNavigate();
+  const { addToCart, setIsCartOpen } = useCart();
   const { user } = useAuth();
   const { lang, t } = useLanguage();
   const [place, setPlace] = useState(null);
@@ -613,16 +616,23 @@ export default function PlaceDetailPage({ onOpenPostModal }) {
                       </div>
                     </div>
 
-                    <div className="p-3.5 pt-0 flex items-center justify-between">
-                      <span className="font-serif font-bold text-stone-900 text-sm">
-                        ₹{item.price}
-                      </span>
-                      <Link
-                        to="/bazaar"
-                        className="px-3.5 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-[11px] font-bold shadow-sm transition-all"
+                    <div className="p-3.5 pt-0 flex items-center justify-between gap-2">
+                      <div>
+                        <span className="text-[10px] text-stone-400 block leading-tight">Direct Craft MRP</span>
+                        <span className="font-serif font-bold text-stone-900 text-sm">
+                          ₹{Number(item.price).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          addToCart(item);
+                          navigate('/bazaar');
+                        }}
+                        className="px-3.5 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-[11px] font-bold shadow-sm transition-all flex items-center gap-1 active:scale-95 cursor-pointer"
                       >
-                        Support Artisan & Order
-                      </Link>
+                        <ShoppingBag className="w-3.5 h-3.5" />
+                        <span>Support Artisan & Order</span>
+                      </button>
                     </div>
                   </div>
                 ))}

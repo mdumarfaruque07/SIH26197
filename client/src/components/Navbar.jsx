@@ -3,10 +3,12 @@ import { Link, useLocation } from 'react-router-dom';
 import { MapPin, Compass, Camera, ShieldCheck, LogIn, LogOut, User, Menu, X, Landmark, Bookmark, ShoppingBag, Languages, Store } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useCart } from '../context/CartContext';
 
 export default function Navbar({ onOpenPostModal, onOpenMenu }) {
   const { user, logout, isAdmin } = useAuth();
   const { lang, toggleLanguage, t } = useLanguage();
+  const { cartCount, setIsCartOpen } = useCart();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -133,6 +135,21 @@ export default function Navbar({ onOpenPostModal, onOpenMenu }) {
               <span>{lang === 'hi' ? 'प्रोफ़ाइल' : 'Profile'}</span>
             </Link>
 
+            {/* Cart Trigger Pill */}
+            <Link
+              to="/bazaar"
+              onClick={() => setIsCartOpen(true)}
+              className="relative p-2 rounded-full border border-stone-200 bg-stone-50 hover:bg-orange-50 text-stone-700 hover:text-orange-600 transition-colors shadow-2xs flex items-center justify-center"
+              title={lang === 'hi' ? 'शॉपिंग कार्ट' : 'Shopping Cart'}
+            >
+              <ShoppingBag className="w-4 h-4 text-orange-600" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-orange-600 text-white text-[10px] font-black flex items-center justify-center shadow-xs">
+                  {cartCount}
+                </span>
+              )}
+            </Link>
+
             <button
               onClick={onOpenPostModal}
               className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold bg-stone-900 hover:bg-heritage-600 text-white shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
@@ -205,6 +222,21 @@ export default function Navbar({ onOpenPostModal, onOpenMenu }) {
               <User className="w-4 h-4 text-amber-600" />
             </Link>
 
+            {/* Quick Mobile Cart Link */}
+            <Link
+              to="/bazaar"
+              onClick={() => setIsCartOpen(true)}
+              className="relative p-2 rounded-full border border-stone-200 bg-stone-50 text-orange-600"
+              title="Cart"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[14px] h-3.5 px-0.5 rounded-full bg-orange-600 text-white text-[9px] font-black flex items-center justify-center">
+                  {cartCount}
+                </span>
+              )}
+            </Link>
+
             <button
               onClick={onOpenPostModal}
               className="p-2 rounded-full bg-heritage-500 text-white shadow-sm"
@@ -248,6 +280,24 @@ export default function Navbar({ onOpenPostModal, onOpenMenu }) {
           >
             <ShoppingBag className="w-5 h-5 text-orange-500" />
             ODOP Bazaar
+          </Link>
+          <Link
+            to="/cart"
+            onClick={() => {
+              setMobileMenuOpen(false);
+              setIsCartOpen(true);
+            }}
+            className="flex items-center justify-between px-3 py-2.5 rounded-lg text-stone-700 hover:bg-stone-50 font-medium"
+          >
+            <div className="flex items-center gap-3">
+              <ShoppingBag className="w-5 h-5 text-orange-600" />
+              <span>{lang === 'hi' ? 'शिल्प थैला (Cart)' : 'Shopping Cart'}</span>
+            </div>
+            {cartCount > 0 && (
+              <span className="px-2 py-0.5 rounded-full bg-orange-600 text-white text-xs font-bold font-mono">
+                {cartCount}
+              </span>
+            )}
           </Link>
           <Link
             to="/artisan-portal"

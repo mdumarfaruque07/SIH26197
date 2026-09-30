@@ -3,11 +3,13 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { Compass, Map, Search, ShoppingBag, User } from 'lucide-react';
 import { useKeyboardVisible } from '../hooks/useKeyboardVisible';
 import { useLanguage } from '../context/LanguageContext';
+import { useCart } from '../context/CartContext';
 
 export default function BottomNav({ onOpenSearch }) {
   const location = useLocation();
   const isKeyboardVisible = useKeyboardVisible();
   const { lang, t } = useLanguage();
+  const { cartCount } = useCart();
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
 
   useEffect(() => {
@@ -57,7 +59,7 @@ export default function BottomNav({ onOpenSearch }) {
       to: '/bazaar',
       label: t('navBazaar'),
       icon: ShoppingBag,
-      badge: 'ODOP',
+      badge: cartCount > 0 ? `${cartCount}` : 'ODOP',
     },
     {
       to: '/profile',

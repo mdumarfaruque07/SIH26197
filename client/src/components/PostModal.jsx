@@ -180,10 +180,15 @@ export default function PostModal({ isOpen, onClose, onSuccess, initialPlaceId =
     setError('');
 
     try {
+      const selectedPlace = places.find((p) => String(p.id) === String(placeId));
       const formData = new FormData();
       formData.append('placeId', placeId);
+      if (selectedPlace) {
+        formData.append('placeSlug', selectedPlace.slug || '');
+        formData.append('placeName', selectedPlace.name || '');
+      }
       formData.append('rating', rating);
-      formData.append('caption', caption);
+      formData.append('caption', caption || '');
 
       if (uploadMode === 'file' && imageFile) {
         formData.append('image', imageFile);
@@ -191,23 +196,32 @@ export default function PostModal({ isOpen, onClose, onSuccess, initialPlaceId =
         formData.append('imageUrl', imageUrl.trim());
       }
 
-      const res = await postService.create(formData);
-      if (res.success && res.post) {
+      const res = await postService.create(formData, {
+        placeId,
+        place: selectedPlace,
+        rating,
+        caption,
+        imageUrl: uploadMode === 'url' ? imageUrl.trim() : imagePreview,
+      });
+
+      if (res && (res.success || res.post)) {
+        const createdPost = res.post || res;
         // Record created post id to my posts tracker
         try {
           const ids = JSON.parse(localStorage.getItem('sanskriti_my_post_ids') || '[]');
-          if (!ids.includes(res.post.id)) {
-            localStorage.setItem('sanskriti_my_post_ids', JSON.stringify([res.post.id, ...ids]));
+          if (createdPost.id && !ids.includes(createdPost.id)) {
+            localStorage.setItem('sanskriti_my_post_ids', JSON.stringify([createdPost.id, ...ids]));
           }
         } catch {}
         window.dispatchEvent(new Event('sanskriti_my_posts_changed'));
-        onSuccess && onSuccess(res.post);
+        onSuccess && onSuccess(createdPost);
         onClose();
       } else {
-        setError(res.message || 'Failed to submit post');
+        setError(res?.message || 'Failed to submit post');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Error uploading photo. Try again.');
+      console.warn('Post submit error handled:', err);
+      setError(err.response?.data?.message || err.message || 'Error uploading photo. Try again.');
     } finally {
       setSubmitting(false);
     }

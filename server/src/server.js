@@ -13,6 +13,7 @@ import productRoutes from './routes/productRoutes.js';
 import supportRoutes from './routes/supportRoutes.js';
 import foodRoutes from './routes/foodRoutes.js';
 import artisanRoutes from './routes/artisanRoutes.js';
+import orderRoutes from './routes/orderRoutes.js';
 import ttsRoutes from './routes/ttsRoutes.js';
 
 dotenv.config();
@@ -53,6 +54,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/places', placeRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/orders', orderRoutes);
 app.use('/api/food', foodRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/artisan-verification', artisanRoutes);

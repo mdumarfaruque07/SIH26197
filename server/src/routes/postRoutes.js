@@ -15,9 +15,18 @@ import { upload } from '../middlewares/uploadMiddleware.js';
 
 const router = Router();
 
+const safeUpload = (req, res, next) => {
+  upload.single('image')(req, res, (err) => {
+    if (err) {
+      console.warn('Multer upload warning (proceeding if imageUrl is provided):', err.message);
+    }
+    next();
+  });
+};
+
 router.get('/feed', optionalAuth, getFeedPosts);
 router.get('/my-posts', optionalAuth, getMyPosts);
-router.post('/', optionalAuth, upload.single('image'), createPost);
+router.post('/', optionalAuth, safeUpload, createPost);
 router.patch('/:id', optionalAuth, updatePost);
 router.put('/:id', optionalAuth, updatePost);
 router.post('/:id/like', optionalAuth, toggleLikePost);

@@ -539,7 +539,7 @@ export default function InstagramPostCard({ post, onLikeChange, onPostDelete, on
           </div>
 
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className="font-bold text-xs sm:text-sm text-stone-900 truncate">
                 {post.user?.name || 'Cultural Traveler'}
               </span>
@@ -550,6 +550,25 @@ export default function InstagramPostCard({ post, onLikeChange, onPostDelete, on
               {isAuthor && (
                 <span className="px-1.5 py-0.2 rounded-md bg-stone-100 text-stone-600 font-bold text-[9px] uppercase tracking-wider">
                   {lang === 'hi' ? 'आपकी पोस्ट' : 'You'}
+                </span>
+              )}
+              {/* Algorithmic Discovery Badges */}
+              {post.isNearby && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[9px] whitespace-nowrap">
+                  <span>📍</span>
+                  <span>{post.distKm ? `${post.distKm} km` : (lang === 'hi' ? 'निकट' : 'Nearby')}</span>
+                </span>
+              )}
+              {!post.isNearby && post.isTrending && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200 font-bold text-[9px] whitespace-nowrap">
+                  <span>🔥</span>
+                  <span>{lang === 'hi' ? 'ट्रेंडिंग' : 'Trending'}</span>
+                </span>
+              )}
+              {!post.isNearby && !post.isTrending && post.isFresh && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 font-bold text-[9px] whitespace-nowrap">
+                  <span>✨</span>
+                  <span>{lang === 'hi' ? 'नया' : 'Fresh'}</span>
                 </span>
               )}
             </div>

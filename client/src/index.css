@@ -11,20 +11,42 @@
   }
 }
 
-/* Custom scrollbars */
+/* Custom scrollbars (Sleek vertical scrollbar, completely hidden horizontal bars) */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 0px;
+}
+::-webkit-scrollbar:horizontal {
+  display: none !important;
+  height: 0px !important;
+  width: 0px !important;
 }
 ::-webkit-scrollbar-track {
-  background: #f1ede6;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d7641d;
-  border-radius: 4px;
+  background: rgba(215, 100, 29, 0.4);
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #b44818;
+  background: #d7641d;
+}
+
+/* Hide scrollbar utility for stories, filters, categories while keeping touch/mouse scrolling active */
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar,
+[data-no-scrollbar]::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.no-scrollbar,
+.scrollbar-none,
+[data-no-scrollbar] {
+  -ms-overflow-style: none !important; /* IE and Edge */
+  scrollbar-width: none !important; /* Firefox */
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Leaflet styling customizations */
@@ -80,5 +102,106 @@ body.modal-scroll-locked {
   overscroll-behavior: none !important;
   touch-action: none;
 }
+
+/* ==========================================================================
+   Universal High-Fidelity Printing Stylesheet
+   Ensures crystal-clear A4 printing for Invoices, Counter Standees & Shipping Slips
+   ========================================================================== */
+@media screen {
+  .print-only,
+  #printable-invoice-portal,
+  #printable-standee-portal,
+  #printable-shipping-portal {
+    display: none !important;
+  }
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm 12mm 12mm;
+  }
+
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #111827 !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* 1. Target: Invoice Printing */
+  body.printing-invoice #root {
+    display: none !important;
+  }
+  body.printing-invoice #printable-invoice-portal {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    visibility: visible !important;
+  }
+
+  /* 2. Target: Workshop Countertop Standee */
+  body.printing-standee #root {
+    display: none !important;
+  }
+  body.printing-standee #printable-standee-portal {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    visibility: visible !important;
+  }
+
+  /* 3. Target: SpeedPost Shipping Slip */
+  body.printing-shipping-slip #root {
+    display: none !important;
+  }
+  body.printing-shipping-slip #printable-shipping-portal {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    visibility: visible !important;
+  }
+
+  /* 4. Global Fallback if window.print() called without print class */
+  body:not(.printing-invoice):not(.printing-standee):not(.printing-shipping-slip) nav,
+  body:not(.printing-invoice):not(.printing-standee):not(.printing-shipping-slip) header,
+  body:not(.printing-invoice):not(.printing-standee):not(.printing-shipping-slip) footer,
+  body:not(.printing-invoice):not(.printing-standee):not(.printing-shipping-slip) button,
+  body:not(.printing-invoice):not(.printing-standee):not(.printing-shipping-slip) .no-print,
+  body:not(.printing-invoice):not(.printing-standee):not(.printing-shipping-slip) [data-no-print="true"] {
+    display: none !important;
+  }
+
+  /* Prevent split cuts inside tables and key guarantee cards */
+  tr, .avoid-break {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}
+
 
 

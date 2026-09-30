@@ -37,7 +37,7 @@ export const getApiBaseUrl = () => {
 
   if (isCapacitor) {
     // Current host machine IP on local Wi-Fi / Hotspot
-    return 'http://10.172.59.151:5000/api';
+    return 'http://10.168.182.153:5000/api';
   }
 
   // If accessed directly on mobile browser via computer IP (e.g. http://192.168.x.x:5173)
@@ -65,7 +65,7 @@ export const getApiBaseUrl = () => {
   return '/api';
 };
 
-const api = axios.create({
+export const api = axios.create({
   baseURL: getApiBaseUrl(),
   timeout: 8000, // 8s timeout for wireless mobile network hops to prevent premature abort
 });
@@ -181,22 +181,116 @@ export const placeService = {
 };
 
 export const postService = {
-  getFeed: async () => {
+  getFeed: async (params = {}) => {
+    let localPosts = [];
     try {
-      const res = await api.get('/posts/feed');
-      return res.data;
+      localPosts = JSON.parse(localStorage.getItem('sanskriti_user_created_posts') || '[]');
+    } catch {}
+
+    try {
+      const res = await api.get('/posts/feed', { params });
+      const serverPosts = res.data?.posts || [];
+      const merged = [...localPosts];
+      for (const sp of serverPosts) {
+        if (!merged.some((p) => p.id === sp.id || (p.caption && p.caption === sp.caption && p.placeId === sp.placeId))) {
+          merged.push(sp);
+        }
+      }
+      return { ...res.data, posts: merged };
     } catch (err) {
-      console.warn('Backend /posts/feed failed:', err.message);
-      return { success: true, count: 0, posts: [], isOfflineFallback: true };
+      console.warn('Backend /posts/feed failed, using local fallback:', err.message);
+      return { success: true, count: localPosts.length, posts: localPosts, isOfflineFallback: true };
     }
   },
-  getMyPosts: () => api.get('/posts/my-posts').then((res) => res.data),
-  create: (formData) =>
-    api
-      .post('/posts', formData, {
+  getMyPosts: async () => {
+    let localPosts = [];
+    try {
+      localPosts = JSON.parse(localStorage.getItem('sanskriti_user_created_posts') || '[]');
+    } catch {}
+    try {
+      const res = await api.get('/posts/my-posts');
+      const serverPosts = res.data?.posts || [];
+      const merged = [...localPosts];
+      for (const sp of serverPosts) {
+        if (!merged.some((p) => p.id === sp.id)) {
+          merged.push(sp);
+        }
+      }
+      return { ...res.data, posts: merged };
+    } catch (err) {
+      return { success: true, posts: localPosts, isOfflineFallback: true };
+    }
+  },
+  create: async (formData, meta = {}) => {
+    try {
+      const res = await api.post('/posts', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
-      })
-      .then((res) => res.data),
+      });
+      if (res.data?.success && res.data.post) {
+        try {
+          const localPosts = JSON.parse(localStorage.getItem('sanskriti_user_created_posts') || '[]');
+          localStorage.setItem(
+            'sanskriti_user_created_posts',
+            JSON.stringify([res.data.post, ...localPosts.filter((p) => p.id !== res.data.post.id)])
+          );
+        } catch {}
+        return res.data;
+      }
+      return res.data;
+    } catch (err) {
+      console.warn('Backend /posts error, using instant local post creation:', err.message);
+      let profile = {};
+      try {
+        profile = JSON.parse(localStorage.getItem('sanskriti_profile') || '{}');
+      } catch {}
+
+      const placeObj = meta?.place || {
+        id: meta?.placeId || 23,
+        name: meta?.place?.name || 'Taj Mahal',
+        slug: meta?.place?.slug || 'taj-mahal',
+        state: 'Uttar Pradesh',
+        category: 'monument',
+      };
+
+      const fallbackPost = {
+        id: 'local_post_' + Date.now(),
+        userId: profile.id || 11,
+        placeId: placeObj.id || 23,
+        rating: meta?.rating ? parseInt(meta.rating) : 5,
+        caption: meta?.caption || (formData.get ? formData.get('caption') : '') || '',
+        imageUrl:
+          meta?.imageUrl ||
+          (formData.get ? formData.get('imageUrl') : '') ||
+          'https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=1200&q=80',
+        likesCount: Math.floor(15 + Math.random() * 20),
+        hasLiked: false,
+        timeAgo: 'Just now',
+        createdAt: new Date().toISOString(),
+        user: {
+          id: profile.id || 11,
+          name: profile.name || 'Culture Traveler',
+          avatarUrl:
+            profile.avatarUrl ||
+            'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+        },
+        place: placeObj,
+        comments: [],
+        isLocalFallback: true,
+      };
+
+      try {
+        const localPosts = JSON.parse(localStorage.getItem('sanskriti_user_created_posts') || '[]');
+        localStorage.setItem('sanskriti_user_created_posts', JSON.stringify([fallbackPost, ...localPosts]));
+      } catch {}
+
+      return {
+        success: true,
+        message: 'Post published successfully!',
+        post: fallbackPost,
+        isOfflineFallback: true,
+      };
+    }
+  },
   update: (id, data) => api.patch(`/posts/${id}`, data).then((res) => res.data),
   toggleLike: (id) => api.post(`/posts/${id}/like`).then((res) => res.data),
   addComment: (id, data) => api.post(`/posts/${id}/comments`, data).then((res) => res.data),
@@ -440,7 +534,39 @@ export const productService = {
       return { success: true, product: newProduct, isOfflineFallback: true };
     }
   },
+  addReview: async (productId, reviewData) => {
+    try {
+      const res = await api.post(`/products/${productId}/reviews`, reviewData);
+      return res.data;
+    } catch (err) {
+      console.warn('Backend add review failed, saving to local reviews:', err.message);
+      const key = `sanskriti_product_reviews_${productId}`;
+      const existing = JSON.parse(localStorage.getItem(key) || '[]');
+      const newRev = {
+        id: Date.now(),
+        productId: Number(productId),
+        ...reviewData,
+        verifiedBuy: true,
+        createdAt: new Date().toISOString(),
+      };
+      existing.unshift(newRev);
+      localStorage.setItem(key, JSON.stringify(existing));
+      return { success: true, review: newRev, isOfflineFallback: true };
+    }
+  },
+  getReviews: async (productId) => {
+    try {
+      const res = await api.get(`/products/${productId}/reviews`);
+      return res.data;
+    } catch (err) {
+      const key = `sanskriti_product_reviews_${productId}`;
+      const existing = JSON.parse(localStorage.getItem(key) || '[]');
+      return { success: true, count: existing.length, reviews: existing, isOfflineFallback: true };
+    }
+  },
 };
+
+export { orderService } from './orderService';
 
 export const foodService = {
   getAll: async (params) => {
